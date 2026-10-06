@@ -1,0 +1,26 @@
+# User IDE config
+.vscode/
+.agents/
+
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Environment variables and secrets
+.env
+.env.local
+
+# SQLite databases
+*.db
+*.sqlite3
+
+# Operating system files
+.DS_Store
+Thumbs.db
