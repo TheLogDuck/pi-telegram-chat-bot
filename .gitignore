@@ -1,26 +1,26 @@
-# User IDE config
+# IDE settings
 .vscode/
 .agents/
 
-# Python bytecode and cache
+# Python bytecode and compiled artifacts
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache
 
 # Virtual environments
 venv/
 .venv/
 env/
-ENV/
 
-# Environment variables and secrets
+# Secrets and environment configurations
 .env
 .env.local
 
-# SQLite databases
+# SQLite database files
 *.db
 *.sqlite3
 
-# Operating system files
+# Operating system metadata
 .DS_Store
 Thumbs.db

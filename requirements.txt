@@ -1,2 +1,11 @@
-python-telegram-bot>=20.0
-python-dotenv>=1.0.0
+# Async Telegram bot framework (v20+ async architecture)
+python-telegram-bot==22.8
+
+# Lightweight Google Gemini API client
+google-genai==2.28.0
+
+# Secret and configuration management via .env
+python-dotenv==1.2.4
+
+# Automated test runner for unit testing
+pytest==9.1.1

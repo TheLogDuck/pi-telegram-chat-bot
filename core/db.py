@@ -1,13 +1,98 @@
-# Core database utility using Python standard library SQLite
+# Database management module using Python's standard library sqlite3.
+# Keeps memory usage near 0 MB additional overhead compared to heavy ORMs.
+import asyncio
+from datetime import datetime, timezone
 import os
 import sqlite3
+from typing import Optional
 
-DB_PATH = os.getenv("DATABASE_PATH", "bot_data.db")
+DEFAULT_DB_PATH = "bot_memory.db"
 
-def get_connection() -> sqlite3.Connection:
-    """Creates and returns a connection to the SQLite database."""
-    # SQLite requires no server daemon, making it ideal for low-resource environments
-    conn = sqlite3.connect(DB_PATH)
-    # Enable name-based column access on returned rows
+def get_db_path() -> str:
+    """Returns database file path from environment or default."""
+    return os.getenv("DATABASE_PATH", DEFAULT_DB_PATH)
+
+def get_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
+    """Establishes an SQLite connection configured for concurrent safety."""
+    path = db_path or get_db_path()
+    conn = sqlite3.connect(path)
+    # Return rows as dict-like objects for easier column access
     conn.row_factory = sqlite3.Row
+    # WAL mode improves concurrent reads and writes on Raspberry Pi flash storage
+    conn.execute("PRAGMA journal_mode = WAL;")
     return conn
+
+def init_db(db_path: Optional[str] = None) -> None:
+    """Initializes the database schema if tables do not exist."""
+    path = db_path or get_db_path()
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                username TEXT,
+                text TEXT,
+                timestamp TEXT NOT NULL
+            );
+            """
+        )
+        # Index on chat_id and timestamp speeds up queries for message history
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_messages_chat_timestamp
+            ON messages (chat_id, timestamp);
+            """
+        )
+        conn.commit()
+
+def save_message(
+    chat_id: int,
+    user_id: int,
+    username: Optional[str],
+    text: str,
+    timestamp: Optional[str] = None,
+    db_path: Optional[str] = None,
+) -> int:
+    """Synchronous worker function to insert a message into SQLite."""
+    if timestamp is None:
+        # Standardize timestamps in UTC ISO-8601 format
+        timestamp = datetime.now(timezone.utc).isoformat()
+
+    path = db_path or get_db_path()
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO messages (chat_id, user_id, username, text, timestamp)
+            VALUES (?, ?, ?, ?, ?);
+            """,
+            (chat_id, user_id, username, text, timestamp),
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+async def async_save_message(
+    chat_id: int,
+    user_id: int,
+    username: Optional[str],
+    text: str,
+    timestamp: Optional[str] = None,
+    db_path: Optional[str] = None,
+) -> int:
+    """Non-blocking async wrapper that delegates disk I/O to a worker thread.
+    
+    This prevents blocking the Telegram event loop while maintaining zero
+    external library footprint.
+    """
+    return await asyncio.to_thread(
+        save_message,
+        chat_id,
+        user_id,
+        username,
+        text,
+        timestamp,
+        db_path,
+    )
