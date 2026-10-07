@@ -19,8 +19,18 @@ env/
 
 # SQLite database files
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 
 # Operating system metadata
 .DS_Store
 Thumbs.db
+
+# Agent skills
+graphify-out/
+
+# Application and deployment logs
+*.log
+*.log.*
+logs/

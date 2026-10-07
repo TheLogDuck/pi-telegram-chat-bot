@@ -1,0 +1,19 @@
+[Unit]
+Description=Raspberry Pi Telegram Bot (Production)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/admin/pi-telegram-chat-bot
+ExecStart=/home/admin/pi-telegram-chat-bot/venv/bin/python main.py
+Restart=always
+RestartSec=5
+TimeoutStopSec=10
+KillSignal=SIGTERM
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -4,10 +4,15 @@ import sys
 from dotenv import load_dotenv
 from telegram.ext import ApplicationBuilder
 from core.db import init_db
+from core.error_handler import global_error_handler
 from core.logger import setup_logger
+from modules.analytics import register_analytics
+from modules.commands import register_commands, set_bot_commands
 from modules.listener import register_listener
 
+
 logger = setup_logger("main")
+
 
 def main() -> None:
     """Bootstraps the database and starts the Telegram long-polling loop."""
@@ -28,11 +33,26 @@ def main() -> None:
         logger.error("Missing TELEGRAM_BOT_TOKEN in .env file.")
         sys.exit(1)
 
-    # Build Telegram bot application
-    app = ApplicationBuilder().token(token).build()
+    # Build Telegram bot application with post_init hook for commands menu
+    app = (
+        ApplicationBuilder()
+        .token(token)
+        .post_init(set_bot_commands)
+        .build()
+    )
 
-    # Register passive message logging handler
+
+    # Register passive message logging handler (group -1)
     register_listener(app)
+
+    # Register standard bot commands (group 0)
+    register_commands(app)
+    register_analytics(app)
+
+    # Register global uncaught error handler
+    app.add_error_handler(global_error_handler)
+
+
 
     logger.info("Bot is active and listening via long-polling...")
     # Long-polling respects strict dorm firewalls and handles SIGINT/SIGTERM cleanly
