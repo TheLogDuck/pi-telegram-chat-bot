@@ -159,5 +159,23 @@ async def generate_news_briefing(
             )
             continue
 
-    logger.error("All candidate models failed during grounded news briefing.")
+    # Fallback to standard model synthesis if Google Search tool quota is exhausted (Free Tier)
+    logger.info("Search tool quota unavailable on Free Tier. Falling back to standard AI synthesis...")
+    standard_config = types.GenerateContentConfig(
+        system_instruction=NEWS_SYSTEM_INSTRUCTION,
+    )
+    for model_name in get_candidate_models():
+        try:
+            response = await llm_client.aio.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=standard_config,
+            )
+            if response and response.text:
+                return response.text.strip()
+        except Exception as exc:
+            logger.warning(f"Standard news generation with {model_name} failed: {exc}")
+            continue
+
+    logger.error("All candidate models failed during news briefing.")
     return API_ERROR_MESSAGE

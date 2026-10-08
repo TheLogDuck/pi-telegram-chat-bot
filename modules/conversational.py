@@ -3,7 +3,7 @@
 import re
 from typing import Optional
 from telegram import Update
-from telegram.constants import ChatAction, ChatType
+from telegram.constants import ChatAction, ChatType, ParseMode
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 from core.llm import generate_response
 from core.logger import setup_logger
@@ -18,7 +18,7 @@ logger = setup_logger("conversational")
 EMPTY_TAG_PROMPT = "Привіт! Чим я можу вам допомогти?"
 
 
-from core.telegram_utils import clean_bot_mention, is_bot_mentioned
+from core.telegram_utils import clean_bot_mention, is_bot_mentioned, send_formatted_reply
 
 
 async def conversational_chat_handler(
@@ -78,8 +78,8 @@ async def conversational_chat_handler(
     # Generate response via the non-blocking Gemini wrapper
     ai_response = await generate_response(cleaned_prompt)
 
-    # Reply directly to the user's message
-    await message.reply_text(ai_response)
+    # Reply directly to the user's message with rendered HTML (or safe fallback)
+    await send_formatted_reply(message, ai_response)
 
 
 def register_conversational(app: Application) -> None:

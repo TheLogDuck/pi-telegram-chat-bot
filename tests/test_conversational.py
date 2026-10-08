@@ -3,7 +3,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from telegram import Chat, Message, Update, User
-from telegram.constants import ChatAction, ChatType
+from telegram.constants import ChatAction, ChatType, ParseMode
 from telegram.ext import Application
 from modules.conversational import (
     EMPTY_TAG_PROMPT,
@@ -124,7 +124,10 @@ def test_conversational_handler_tagged_generates_ai_response(mock_generate: Asyn
         action=ChatAction.TYPING,
     )
     mock_generate.assert_awaited_once_with("розкажи про зорі")
-    update.effective_message.reply_text.assert_awaited_once_with("Це чудове запитання про науку.")
+    update.effective_message.reply_text.assert_awaited_once_with(
+        "Це чудове запитання про науку.",
+        parse_mode=ParseMode.HTML,
+    )
 
 
 def test_conversational_handler_dispatches_ping_intent() -> None:

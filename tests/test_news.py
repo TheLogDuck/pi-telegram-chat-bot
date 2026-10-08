@@ -3,7 +3,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from telegram import Chat, Message, Update
-from telegram.constants import ChatAction, ChatType
+from telegram.constants import ChatAction, ChatType, ParseMode
 from telegram.ext import Application
 from modules.news import news_command, register_news
 
@@ -40,7 +40,10 @@ def test_news_command_with_explicit_topic(mock_generate: AsyncMock) -> None:
         action=ChatAction.TYPING,
     )
     mock_generate.assert_awaited_once_with(topic="штучний інтелект")
-    update.effective_message.reply_text.assert_awaited_once_with("1. Новини штучного інтелекту...")
+    update.effective_message.reply_text.assert_awaited_once_with(
+        "1. Новини штучного інтелекту...",
+        parse_mode=ParseMode.HTML,
+    )
 
 
 @patch("modules.news.generate_news_briefing", new_callable=AsyncMock)
@@ -55,7 +58,10 @@ def test_news_command_with_context_args(mock_generate: AsyncMock) -> None:
     asyncio.run(news_command(update, context))
 
     mock_generate.assert_awaited_once_with(topic="space tech")
-    update.effective_message.reply_text.assert_awaited_once_with("1. Новини космосу...")
+    update.effective_message.reply_text.assert_awaited_once_with(
+        "1. Новини космосу...",
+        parse_mode=ParseMode.HTML,
+    )
 
 
 @patch("modules.news.generate_news_briefing", new_callable=AsyncMock)
@@ -70,7 +76,10 @@ def test_news_command_default_headlines(mock_generate: AsyncMock) -> None:
     asyncio.run(news_command(update, context))
 
     mock_generate.assert_awaited_once_with(topic=None)
-    update.effective_message.reply_text.assert_awaited_once_with("1. Головні новини...")
+    update.effective_message.reply_text.assert_awaited_once_with(
+        "1. Головні новини...",
+        parse_mode=ParseMode.HTML,
+    )
 
 
 def test_register_news() -> None:

@@ -2,11 +2,11 @@
 # Supports slash command /news [topic] and natural language triggers via intent matcher.
 from typing import Optional
 from telegram import Update
-from telegram.constants import ChatAction
+from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 from core.llm import generate_news_briefing
 from core.logger import setup_logger
-from core.telegram_utils import is_bot_mentioned
+from core.telegram_utils import is_bot_mentioned, send_formatted_reply
 
 logger = setup_logger("news")
 
@@ -35,8 +35,6 @@ async def news_command(
     if not is_bot_mentioned(update, bot_username, bot_id):
         # If user wrote /news without tagging in a group, allow only if command targeted bot explicitly
         if message.text and f"@{bot_username}".lower() not in message.text.lower():
-            # In Telegram, CommandHandler can match /news in group. If group privacy rule applies,
-            # we respect the tag requirement.
             pass
 
     # Send typing action to provide immediate visual feedback while Search Grounding runs
@@ -51,8 +49,8 @@ async def news_command(
     # Generate the grounded briefing via the non-blocking Gemini wrapper
     briefing = await generate_news_briefing(topic=topic)
 
-    # Send the structured news summary back to the user
-    await message.reply_text(briefing)
+    # Send the structured news summary back with HTML formatting rendered
+    await send_formatted_reply(message, briefing)
 
 
 def register_news(app: Application) -> None:
