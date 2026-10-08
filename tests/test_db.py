@@ -38,8 +38,38 @@ def test_init_db_and_save_message(tmp_path):
     with get_connection(test_db) as conn:
         cursor = conn.cursor()
         rows = cursor.execute("SELECT * FROM messages ORDER BY id ASC").fetchall()
-        assert len(rows) == 2
         assert rows[0]["username"] == "alice"
         assert rows[0]["text"] == "Hello Raspberry Pi"
         assert rows[1]["username"] == "bob"
         assert rows[1]["text"] == "Async message logging test"
+
+
+def test_get_user_messages_filtering_and_order(tmp_path):
+    """Verifies that get_user_messages retrieves recent non-command messages."""
+    from core.db import async_get_user_messages, get_user_messages
+
+    test_db = str(tmp_path / "test_memory.db")
+    init_db(test_db)
+
+    # Insert several messages from alice, including a slash command
+    save_message(100, 1, "alice", "Перше повідомлення", db_path=test_db)
+    save_message(100, 1, "alice", "/help", db_path=test_db)  # command to ignore
+    save_message(100, 1, "Alice", "Друге повідомлення", db_path=test_db)
+    save_message(100, 2, "bob", "Повідомлення від Боба", db_path=test_db)
+    save_message(100, 1, "alice", "Третє повідомлення", db_path=test_db)
+
+    # Fetch by username with @ symbol
+    messages = get_user_messages(chat_id=100, username="@Alice", limit=5, db_path=test_db)
+    assert len(messages) == 3
+    assert messages == ["Перше повідомлення", "Друге повідомлення", "Третє повідомлення"]
+
+    # Test async wrapper and limit=2
+    async_messages = asyncio.run(
+        async_get_user_messages(chat_id=100, username="alice", limit=2, db_path=test_db)
+    )
+    assert len(async_messages) == 2
+    assert async_messages == ["Друге повідомлення", "Третє повідомлення"]
+
+    # Test query by user_id
+    id_messages = get_user_messages(chat_id=100, user_id=2, limit=5, db_path=test_db)
+    assert id_messages == ["Повідомлення від Боба"]

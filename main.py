@@ -11,6 +11,7 @@ from modules.commands import register_commands, set_bot_commands
 from modules.conversational import register_conversational
 from modules.listener import register_listener
 from modules.news import register_news
+from modules.roast import register_roast
 
 
 logger = setup_logger("main")
@@ -51,6 +52,7 @@ def main() -> None:
     register_commands(app)
     register_analytics(app)
     register_news(app)
+    register_roast(app)
 
     # Register conversational AI chat handler (group 0)
     register_conversational(app)

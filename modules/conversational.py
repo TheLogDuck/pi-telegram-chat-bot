@@ -11,6 +11,7 @@ from modules.analytics import stats_command
 from modules.commands import help_command, ping_command
 from modules.intent import IntentType, detect_intent
 from modules.news import news_command
+from modules.roast import roast_command
 
 logger = setup_logger("conversational")
 
@@ -63,6 +64,9 @@ async def conversational_chat_handler(
         return
     elif intent_result.intent == IntentType.NEWS:
         await news_command(update, context, topic=intent_result.topic)
+        return
+    elif intent_result.intent == IntentType.ROAST:
+        await roast_command(update, context, target_user=intent_result.target_user)
         return
 
     # Inform the user that Gemini is processing their response

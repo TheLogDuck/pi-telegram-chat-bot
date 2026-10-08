@@ -179,3 +179,68 @@ async def generate_news_briefing(
 
     logger.error("All candidate models failed during news briefing.")
     return API_ERROR_MESSAGE
+
+
+# System instruction for standup comedy roast persona in Ukrainian
+ROAST_SYSTEM_INSTRUCTION = (
+    "Ти саркастичний, гострий на язик, але доброзичливий стендап-комік. "
+    "Твоє завдання — зробити дотепний, смішний і колоритний дружній 'прожар' (роаст) користувача. "
+    "Жартуй яскраво, з українським колоритом, доброзичливою іронією та сарказмом, без злих образ чи токсичності. "
+    "Якщо надані останні повідомлення користувача в чаті, обов'язково обіграй їхні теми або манеру спілкування. "
+    "Ти ЗАВЖДИ відповідаєш виключно українською мовою."
+)
+
+
+async def generate_roast(
+    target_name: str,
+    context_messages: Optional[list[str]] = None,
+    client: Optional[genai.Client] = None,
+) -> str:
+    """Generates a witty standup comedy roast of a user in Ukrainian.
+
+    Args:
+        target_name: The username or display name of the user being roasted.
+        context_messages: Optional recent messages sent by the user for context.
+        client: Optional injected Gemini client for unit testing.
+
+    Returns:
+        A humorous roast in Ukrainian, or a friendly fallback message on failure.
+    """
+    clean_target = target_name.lstrip("@").strip()
+    if context_messages:
+        quotes = "\n".join(f"- {msg}" for msg in context_messages)
+        prompt = (
+            f"Влаштуй дотепний дружній роаст користувача @{clean_target}.\n"
+            f"Ось кілька його останніх реплік у цьому чаті:\n{quotes}\n\n"
+            "Обіграй ці цитати або звички у короткій, смішній стендап-прожарці (1-3 абзаци). "
+            "Відповідай виключно українською мовою."
+        )
+    else:
+        prompt = (
+            f"Влаштуй дотепний дружній роаст користувача @{clean_target}.\n"
+            "Цей користувач поки що майже нічого не писав у цьому чаті (або майстерно ховається у засідці). "
+            "Пожартуй над цим у короткій стендап-прожарці (1-2 абзаци). "
+            "Відповідай виключно українською мовою."
+        )
+
+    llm_client = client or get_gemini_client()
+    config = types.GenerateContentConfig(
+        system_instruction=ROAST_SYSTEM_INSTRUCTION,
+    )
+
+    for model_name in get_candidate_models():
+        try:
+            response = await llm_client.aio.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=config,
+            )
+            if response and response.text:
+                return response.text.strip()
+            logger.warning(f"Model {model_name} returned empty roast text.")
+        except Exception as exc:
+            logger.warning(f"Roast generation with {model_name} failed: {exc}")
+            continue
+
+    logger.error("All candidate models failed during roast generation.")
+    return API_ERROR_MESSAGE

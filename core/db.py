@@ -96,3 +96,79 @@ async def async_save_message(
         timestamp,
         db_path,
     )
+
+
+def get_user_messages(
+    chat_id: int,
+    username: Optional[str] = None,
+    user_id: Optional[int] = None,
+    limit: int = 5,
+    db_path: Optional[str] = None,
+) -> list[str]:
+    """Retrieves recent non-command messages from a user in a specific chat."""
+    path = db_path or get_db_path()
+    clean_username = username.lstrip("@").lower() if username else None
+
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        # Query messages matching either username or user_id, excluding slash commands
+        if clean_username and user_id:
+            cursor.execute(
+                """
+                SELECT text FROM messages
+                WHERE chat_id = ?
+                  AND (LOWER(username) = ? OR user_id = ?)
+                  AND text NOT LIKE '/%'
+                ORDER BY id DESC
+                LIMIT ?;
+                """,
+                (chat_id, clean_username, user_id, limit),
+            )
+        elif clean_username:
+            cursor.execute(
+                """
+                SELECT text FROM messages
+                WHERE chat_id = ?
+                  AND LOWER(username) = ?
+                  AND text NOT LIKE '/%'
+                ORDER BY id DESC
+                LIMIT ?;
+                """,
+                (chat_id, clean_username, limit),
+            )
+        elif user_id:
+            cursor.execute(
+                """
+                SELECT text FROM messages
+                WHERE chat_id = ?
+                  AND user_id = ?
+                  AND text NOT LIKE '/%'
+                ORDER BY id DESC
+                LIMIT ?;
+                """,
+                (chat_id, user_id, limit),
+            )
+        else:
+            return []
+
+        rows = cursor.fetchall()
+        # Return chronologically (oldest first) so the AI reads the conversation naturally
+        return [row["text"] for row in reversed(rows)]
+
+
+async def async_get_user_messages(
+    chat_id: int,
+    username: Optional[str] = None,
+    user_id: Optional[int] = None,
+    limit: int = 5,
+    db_path: Optional[str] = None,
+) -> list[str]:
+    """Non-blocking async wrapper to retrieve a user's recent messages from SQLite."""
+    return await asyncio.to_thread(
+        get_user_messages,
+        chat_id,
+        username,
+        user_id,
+        limit,
+        db_path,
+    )

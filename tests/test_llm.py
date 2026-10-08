@@ -155,3 +155,51 @@ def test_generate_news_briefing_handles_exception() -> None:
 
     result = asyncio.run(generate_news_briefing("технології", client=mock_client))
     assert result == API_ERROR_MESSAGE
+
+
+def test_generate_roast_with_context() -> None:
+    """Verifies that generate_roast formats target and context quotes in prompt."""
+    from core.llm import generate_roast
+
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = "Смішний роаст про кодування ночами!"
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+    context_msgs = ["я пишу код о 3 ночі", "знову баг у продакшені"]
+    result = asyncio.run(generate_roast("@developer", context_messages=context_msgs, client=mock_client))
+
+    assert result == "Смішний роаст про кодування ночами!"
+    call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
+    assert "@developer" in call_kwargs["contents"]
+    assert "я пишу код о 3 ночі" in call_kwargs["contents"]
+
+
+def test_generate_roast_without_context() -> None:
+    """Verifies that generate_roast generates generic roast when no messages exist."""
+    from core.llm import generate_roast
+
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = "Роаст користувача, який мовчить у засідці!"
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+    result = asyncio.run(generate_roast("lurker", context_messages=None, client=mock_client))
+
+    assert result == "Роаст користувача, який мовчить у засідці!"
+    call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
+    assert "@lurker" in call_kwargs["contents"]
+    assert "засідці" in call_kwargs["contents"]
+
+
+def test_generate_roast_handles_failure() -> None:
+    """Verifies that generate_roast returns API_ERROR_MESSAGE when all models fail."""
+    from core.llm import generate_roast
+
+    mock_client = MagicMock()
+    mock_client.aio.models.generate_content = AsyncMock(
+        side_effect=RuntimeError("Quota limit reached")
+    )
+
+    result = asyncio.run(generate_roast("alice", client=mock_client))
+    assert result == API_ERROR_MESSAGE
