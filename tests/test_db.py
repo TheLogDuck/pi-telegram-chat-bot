@@ -125,3 +125,49 @@ def test_save_and_get_token_usage_stats(tmp_path):
     assert "news" in stats["by_feature"]
     assert stats["by_feature"]["news"]["tokens"] == 500
 
+
+def test_cleanup_old_messages(tmp_path):
+    """Verifies that cleanup_old_messages deletes rows older than retention_days."""
+    from datetime import datetime, timedelta, timezone
+    from core.db import cleanup_old_messages, get_connection, init_db, save_message
+
+    test_db = str(tmp_path / "test_memory.db")
+    init_db(test_db)
+
+    now = datetime.now(timezone.utc)
+    old_ts = (now - timedelta(days=35)).isoformat()
+    recent_ts = (now - timedelta(days=5)).isoformat()
+
+    # Save 1 old message and 1 recent message
+    save_message(1, 1, "alice", "Дуже старе повідомлення", timestamp=old_ts, db_path=test_db)
+    save_message(1, 1, "alice", "Свіже повідомлення", timestamp=recent_ts, db_path=test_db)
+
+    # Prune with 30 days retention
+    deleted = cleanup_old_messages(retention_days=30, db_path=test_db)
+    assert deleted == 1
+
+    # Verify only the recent message remains
+    with get_connection(test_db) as conn:
+        cursor = conn.cursor()
+        rows = cursor.execute("SELECT text FROM messages").fetchall()
+        assert len(rows) == 1
+        assert rows[0]["text"] == "Свіже повідомлення"
+
+
+def test_async_cleanup_old_messages(tmp_path):
+    """Verifies non-blocking async wrapper executes cleanup cleanly."""
+    from datetime import datetime, timedelta, timezone
+    from core.db import async_cleanup_old_messages, init_db, save_message
+
+    test_db = str(tmp_path / "test_memory.db")
+    init_db(test_db)
+
+    now = datetime.now(timezone.utc)
+    old_ts = (now - timedelta(days=40)).isoformat()
+
+    save_message(1, 1, "bob", "Старе повідомлення", timestamp=old_ts, db_path=test_db)
+
+    deleted = asyncio.run(async_cleanup_old_messages(retention_days=30, db_path=test_db))
+    assert deleted == 1
+
+

@@ -1,9 +1,10 @@
 # Application entrypoint: loads configuration, sets up DB, and runs polling.
+import asyncio
 import os
 import sys
 from dotenv import load_dotenv
-from telegram.ext import ApplicationBuilder
-from core.db import init_db
+from telegram.ext import Application, ApplicationBuilder
+from core.db import async_cleanup_old_messages, init_db
 from core.error_handler import global_error_handler
 from core.logger import setup_logger
 from modules.analytics import register_analytics
@@ -16,6 +17,36 @@ from modules.meme import register_meme
 
 
 logger = setup_logger("main")
+
+
+# Daily cleanup interval in seconds (24 hours)
+CLEANUP_INTERVAL_SECONDS = 86400
+
+
+async def periodic_cleanup_task(
+    interval: int = CLEANUP_INTERVAL_SECONDS,
+) -> None:
+    """Runs database pruning periodically in the background (waits 24 hours before first run)."""
+    while True:
+        try:
+            # Wait full interval before performing first cleanup
+            await asyncio.sleep(interval)
+            deleted = await async_cleanup_old_messages()
+            if deleted > 0:
+                logger.info(f"Scheduled maintenance pruned {deleted} old messages.")
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.warning(f"Error during periodic message cleanup: {exc}")
+
+
+async def on_startup(app: Application) -> None:
+    """Post-initialization hook called once the event loop is active."""
+    # Register autocomplete commands in Telegram UI
+    await set_bot_commands(app)
+
+    # Launch non-blocking periodic background cleanup
+    asyncio.create_task(periodic_cleanup_task())
 
 
 def main() -> None:
@@ -37,11 +68,11 @@ def main() -> None:
         logger.error("Missing TELEGRAM_BOT_TOKEN in .env file.")
         sys.exit(1)
 
-    # Build Telegram bot application with post_init hook for commands menu
+    # Build Telegram bot application with post_init hook for commands menu and background tasks
     app = (
         ApplicationBuilder()
         .token(token)
-        .post_init(set_bot_commands)
+        .post_init(on_startup)
         .build()
     )
 

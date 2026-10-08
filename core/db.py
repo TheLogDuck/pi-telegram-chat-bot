@@ -1,12 +1,13 @@
 # Database management module using Python's standard library sqlite3.
 # Keeps memory usage near 0 MB additional overhead compared to heavy ORMs.
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import os
 import sqlite3
 from typing import Optional
 
 DEFAULT_DB_PATH = "bot_memory.db"
+DEFAULT_RETENTION_DAYS = 30
 
 def get_db_path() -> str:
     """Returns database file path from environment or default."""
@@ -347,5 +348,45 @@ def get_token_usage_stats(db_path: Optional[str] = None) -> dict:
 async def async_get_token_usage_stats(db_path: Optional[str] = None) -> dict:
     """Non-blocking async wrapper to aggregate stats off the main thread."""
     return await asyncio.to_thread(get_token_usage_stats, db_path)
+
+
+def cleanup_old_messages(
+    retention_days: Optional[int] = None,
+    db_path: Optional[str] = None,
+) -> int:
+    """Prunes messages older than retention_days to protect MicroSD storage.
+
+    Args:
+        retention_days: Maximum age of messages in days to keep. Defaults to DEFAULT_RETENTION_DAYS.
+        db_path: Optional database file path.
+
+    Returns:
+        Number of deleted rows.
+    """
+    days = retention_days if retention_days is not None else DEFAULT_RETENTION_DAYS
+    path = db_path or get_db_path()
+    init_db(path)
+
+    # Compute cutoff timestamp in UTC ISO-8601 format
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM messages WHERE timestamp < ?;", (cutoff,))
+        deleted_count = cursor.rowcount
+        conn.commit()
+
+        # Checkpoint committed WAL pages back to the database file
+        conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
+        return deleted_count
+
+
+async def async_cleanup_old_messages(
+    retention_days: Optional[int] = None,
+    db_path: Optional[str] = None,
+) -> int:
+    """Non-blocking async wrapper delegating message cleanup to worker thread."""
+    return await asyncio.to_thread(cleanup_old_messages, retention_days, db_path)
+
 
 
