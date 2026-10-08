@@ -58,7 +58,7 @@ def test_stats_command() -> None:
 
     asyncio.run(stats_command(mock_update, mock_context))
 
-    mock_update.effective_message.reply_text.assert_awaited_once_with("Analytics: System operational.")
+    mock_update.effective_message.reply_text.assert_awaited_once_with("Аналітика: система працює у штатному режимі.")
 
 def test_set_bot_commands() -> None:
     """Verifies that set_bot_commands sends the BOT_COMMANDS list to Telegram."""

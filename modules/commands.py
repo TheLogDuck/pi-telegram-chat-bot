@@ -8,20 +8,21 @@ logger = setup_logger("commands")
 
 # Predefined response strings kept as constants to avoid string reallocations
 START_TEXT = (
-    "Welcome! I am your Raspberry Pi Telegram Bot.\n\n"
-    "I listen to group conversations and provide utilities.\n"
-    "Type /help to see available commands."
+    "Вітаю! Я ваш Telegram-бот на базі Raspberry Pi.\n\n"
+    "Я підтримую спілкування за допомогою штучного інтелекту Gemini.\n"
+    "У групах звертайтеся до мене через тег (наприклад, @username).\n"
+    "Введіть /help, щоб переглянути список доступних команд."
 )
 
 HELP_TEXT = (
-    "Available Commands:\n"
-    "/start - Initialize interaction and view welcome message\n"
-    "/help  - Display this command manual\n"
-    "/ping  - Verify bot uptime and connection latency\n"
-    "/stats - Show message activity statistics"
+    "Доступні команди:\n"
+    "/start - Почати взаємодію та переглянути привітання\n"
+    "/help  - Показати довідку щодо команд\n"
+    "/ping  - Перевірити доступність та час відповіді бота\n"
+    "/stats - Показати статистику активності"
 )
 
-PING_TEXT = "Pong! Bot is active and running on Raspberry Pi."
+PING_TEXT = "Понг! Бот активний і працює на Raspberry Pi."
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends a greeting when /start is issued."""
@@ -49,10 +50,10 @@ def register_commands(app: Application) -> None:
 
 # Command directory used by Telegram client autocomplete menu
 BOT_COMMANDS = [
-    BotCommand("start", "Initialize interaction and view welcome message"),
-    BotCommand("help", "Display command manual"),
-    BotCommand("ping", "Verify bot uptime and latency"),
-    BotCommand("stats", "Show message activity statistics"),
+    BotCommand("start", "Почати взаємодію та переглянути привітання"),
+    BotCommand("help", "Показати довідку щодо команд"),
+    BotCommand("ping", "Перевірити доступність та час відповіді бота"),
+    BotCommand("stats", "Показати статистику активності"),
 ]
 
 async def set_bot_commands(app: Application) -> None:

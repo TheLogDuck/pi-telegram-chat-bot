@@ -8,6 +8,7 @@ from core.error_handler import global_error_handler
 from core.logger import setup_logger
 from modules.analytics import register_analytics
 from modules.commands import register_commands, set_bot_commands
+from modules.conversational import register_conversational
 from modules.listener import register_listener
 
 
@@ -48,6 +49,9 @@ def main() -> None:
     # Register standard bot commands (group 0)
     register_commands(app)
     register_analytics(app)
+
+    # Register conversational AI chat handler (group 0)
+    register_conversational(app)
 
     # Register global uncaught error handler
     app.add_error_handler(global_error_handler)
