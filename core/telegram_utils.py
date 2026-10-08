@@ -79,13 +79,15 @@ def markdown_to_telegram_html(text: str) -> str:
 
     text = re.sub(r"```([a-zA-Z0-9_-]*)\n?(.*?)```", stash_code_block, text, flags=re.DOTALL)
 
-    # 2. Stash inline code `...`
+    # 2. Stash inline code `...` and pre-existing <code>...</code> tags
     inline_codes = []
 
     def stash_inline_code(match: re.Match) -> str:
         inline_codes.append(match.group(1))
         return f"TOKENINLINE{len(inline_codes) - 1}ENDTOKEN"
 
+    # Match pre-existing <code>...</code> first so raw HTML tags are not double-escaped
+    text = re.sub(r"<code>(.*?)</code>", stash_inline_code, text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r"`([^`\n]+)`", stash_inline_code, text)
 
     # 3. HTML-escape raw text (&, <, >) to prevent malformed HTML entities

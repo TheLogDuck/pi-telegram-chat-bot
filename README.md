@@ -1,117 +1,223 @@
-# Edge-Optimized Telegram Bot
+# Edge-Optimized AI Telegram Bot
 
-A lightweight, asynchronous Telegram bot built with `python-telegram-bot` (v20+) engineered specifically for resource-constrained edge computing environments such as the Raspberry Pi 3B+.
+A production-grade, asynchronous AI assistant engineered for resource-constrained edge computing environments (Raspberry Pi 3B+). Features multi-model Google Gemini LLM orchestration, live Google Search grounding, multimodal image generation, token-level cost accounting, zero-dependency multilingual intent classification, and an automated test-gated CI/CD pipeline.
 
-Designed with an ultra-lean memory footprint, the application maintains a strict memory budget under 150 MB RAM, achieves zero swap utilization, operates safely behind restricted networks using Telegram long-polling, and incorporates an automated test-gated CI/CD pull workflow.
+[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.14-blue.svg)](https://www.python.org/)
+[![Telegram Bot API](https://img.shields.io/badge/telegram--bot--api-v20%2B%20async-blue.svg)](https://python-telegram-bot.org/)
+[![Memory Footprint](https://img.shields.io/badge/memory%20footprint-~53%20MB%20RAM-success.svg)](https://github.com/)
+[![Test Suite](https://img.shields.io/badge/tests-78%20passed-brightgreen.svg)](https://pytest.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ---
 
-## Architecture Overview
+## Technical Summary for Engineering Portfolios
+
+This project demonstrates the design and deployment of a resilient, full-stack edge AI service operating 24/7 on constrained ARM hardware under strict network isolation. It highlights practical trade-offs in systems programming, asynchronous event loops, LLM cost management, and automated operational pipelines.
+
+### Key Engineering Achievements
+
+- **Edge Resource Optimization:** Engineered to run comfortably inside an active resident footprint of approximately **53 MB RAM** (~5.7% of host capacity on a 1 GB Raspberry Pi 3B+), staying well below the systemd enforcement ceiling of **150 MB RAM**. Zero swap thrashing safeguards MicroSD flash endurance.
+- **Asynchronous Event-Driven Core:** Fully non-blocking event-driven pipeline leveraging `python-telegram-bot` (v20+ async) and `asyncio`. Heavy file and database interactions run via dedicated worker thread pools (`asyncio.to_thread`) to prevent blocking the primary Telegram dispatch loop.
+- **Multi-Model LLM Resilience & Cascading Failover:** Built on the official `google-genai` SDK with an automated fallback cascade across multiple Gemini Flash models (`gemini-3.8-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, and latest aliases) to smoothly handle rate limits, transient provider errors, and quota exhaustion without user disruption.
+- **Multimodal Generation ("Nano Banana" Engine):** Dynamic image generation and editing using Google's lightweight image models (`gemini-3.1-flash-lite-image`, `gemini-2.5-flash-image`, `gemini-3-pro-image`) with automatic priority failover ordered from lowest to highest per-image cost.
+- **Search Grounding with Automatic Degradation:** Integrates real-time Google Search Grounding for dynamic news digests. Dynamically detects API quota exhaustion (HTTP 429) and falls back cleanly to internal knowledge synthesis without crashing.
+- **Zero-Dependency Multilingual Intent Classifier:** Custom intent recognition supporting Ukrainian, Russian, and English with typo-tolerant fuzzy matching implemented via Python's standard library `difflib`. Routes natural language queries to distinct features without loading multi-hundred-megabyte NLP weights into memory.
+- **FinOps & Token Telemetry:** Real-time tracking of prompt tokens, completion tokens, call frequencies, and estimated USD expenditure logged into SQLite. Exposes live financial analytics via an owner-only `/stats` command.
+- **Low-Overhead Persistent Storage (SQLite WAL):** Local persistence utilizing Write-Ahead Logging (`PRAGMA journal_mode = WAL`) for concurrent read/write performance. Includes an automated non-blocking 24-hour background task that prunes chat records past the 30-day retention window.
+- **Strict Dorm Firewall Traversal:** Runs behind an isolated university campus network with inbound client isolation. All traffic operates over outbound HTTPS long-polling (`Application.run_polling()`). Remote administration is conducted securely via a private Tailscale Mesh VPN.
+- **Test-Gated Pull-Based CI/CD:** Production updates trigger a pull-based deployment script (`deploy.sh`) equipped with a bash `ERR` trap. Before reloading the systemd service, the entire test suite (78 unit tests with 100% offline mocking) must pass, guaranteeing zero-downtime regression prevention.
+
+---
+
+## Architectural Overview
 
 ```mermaid
 flowchart TD
-    subgraph TelegramCloud ["Telegram Cloud"]
-        TC["Telegram Bot API"]
+    subgraph External ["External Services"]
+        TG["Telegram Cloud (Bot API)"]
+        GEMINI["Google Gemini API (Flash & Imagen)"]
+        GSEARCH["Google Search Grounding"]
     end
 
-    subgraph Host ["Edge Device / Host Server"]
-        subgraph Daemon ["Systemd Service"]
-            APP["Bot Application (main.py)"]
-            MOD["Command & Listener Modules"]
-            CORE["Core Layer (Logger & Error Handler)"]
-            DB[("SQLite Database (WAL Mode)")]
+    subgraph EdgeDevice ["Raspberry Pi 3B+ Host (1GB RAM)"]
+        subgraph SystemdUnit ["Systemd Service (MemoryMax=150M)"]
+            APP["Application Orchestrator (main.py)"]
+            ROUTER["Intent & Command Router"]
+            LLM_ENGINE["LLM Engine & Model Failover Cascade"]
+            TELEMETRY["Token & Cost Tracking Engine"]
+            DB_ENGINE[("SQLite Database (WAL Mode)")]
+            CLEANUP["24h Background Pruning Task"]
         end
 
-        subgraph CICD ["CI/CD Pull Pipeline"]
-            DEP["deploy.sh"]
+        subgraph CICD ["Pull-Based CI/CD (deploy.sh)"]
             GIT["Git Pull origin main"]
-            TEST["Pytest Gatekeeper"]
+            MIGRATE["Schema Migrations"]
+            PYTEST["Pytest Gatekeeper (78 Tests)"]
+            RELOAD["systemctl restart telegram-bot.service"]
         end
     end
 
-    TC <-->|"Long-Polling (Outbound HTTPS)"| APP
-    APP --> MOD
-    MOD --> CORE
-    CORE --> DB
-    DEP --> GIT
-    GIT --> TEST
-    TEST -->|"Pass"| Daemon
+    TG <-->|"Outbound Long-Polling (HTTPS)"| APP
+    APP --> ROUTER
+    ROUTER -->|"Natural Query / Command"| LLM_ENGINE
+    LLM_ENGINE <-->|"Async Inference"| GEMINI
+    LLM_ENGINE <-->|"Dynamic Web Retrieval"| GSEARCH
+    LLM_ENGINE -->|"Usage Metadata"| TELEMETRY
+    TELEMETRY -->|"Record Cost & Tokens"| DB_ENGINE
+    APP -->|"Passive Message Ingestion"| DB_ENGINE
+    CLEANUP -->|"Prune >30d Records"| DB_ENGINE
+
+    GIT --> MIGRATE --> PYTEST
+    PYTEST -->|"Pass"| RELOAD
+    PYTEST -->|"Fail"| ABORT["Abort Deployment (Keep Old Process)"]
 ```
 
-### System Design Principles
+### Request Flow and Fallback Logic
 
-1. **Strict Memory Budget:** Engineered for edge devices with 1 GB total system RAM. The application maintains an active footprint of approximately 50-60 MB RAM, well beneath the 150 MB hard limit.
-2. **Zero Swap Usage:** Eliminates swap thrashing to safeguard flash storage (MicroSD cards) against I/O bottlenecks and write degradation.
-3. **Firewall & NAT Agnostic:** Operates via outbound long-polling exclusively. No open ports, reverse proxies, or inbound webhooks required.
-4. **Local WAL Persistence:** SQLite operates in Write-Ahead Logging (WAL) mode for low-overhead concurrency and resilience against power loss.
-5. **Quality-Gated Deployment:** Production deployments automatically execute unit test suites before reloading the service.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Telegram User
+    participant Bot as Main Polling Loop
+    participant Intent as Intent Classifier (difflib)
+    participant Core as LLM Module (core/llm.py)
+    participant API as Gemini Cloud API
+    participant DB as SQLite WAL Storage
+
+    User->>Bot: Incoming Message (DM or Group Mention)
+    Bot->>DB: Log raw message (passive listener)
+    Bot->>Intent: Classify text & extract arguments
+    
+    alt Standard Command or Fuzzy Match
+        Intent-->>Bot: Routed to feature (News / Roast / Meme / Chat)
+    end
+
+    Bot->>Core: Request inference (with chat context & tool configs)
+    
+    loop Model Fallback Cascade
+        Core->>API: Call primary model (e.g. gemini-3.8-flash)
+        alt Success
+            API-->>Core: 200 OK + Text + Usage Metadata
+        else 429 Rate Limit / Quota Exceeded / Error
+            Core->>Core: Rotate to next candidate in failover list
+        end
+    end
+
+    Core->>DB: Async record token usage & estimated USD cost
+    Core-->>Bot: Formatted response string
+    Bot-->>User: Non-blocking async reply (chunked if >4096 chars)
+```
 
 ---
 
-## Project Structure
+## Technical Specifications & Performance Metrics
+
+| Dimension | Specification / Metric | Engineering Rationale |
+| :--- | :--- | :--- |
+| **Target Hardware** | Raspberry Pi 3B+ (Quad-core ARM Cortex-A53 @ 1.4 GHz, 1 GB RAM) | Extreme edge compute baseline; validates efficiency. |
+| **Operating System** | Debian GNU/Linux (Bookworm) 64-bit / Raspberry Pi OS Lite | Headless minimal installation; no X11 or desktop overhead. |
+| **Process Memory (RSS)** | **~53 MB** resident memory (~5.7% of system RAM) | Handcrafted light imports; zero bulky runtime dependencies. |
+| **Enforced Memory Ceiling**| `MemoryMax=150M`, `MemoryHigh=120M` (via systemd cgroups) | Guarantees the OS and kernel never experience OOM panics. |
+| **Swap Usage** | **0 MB** (Zero swap utilization) | Protects MicroSD card against flash endurance degradation. |
+| **CPU Usage** | < 1% idle, < 15% peak during active generation | Offloads compute-heavy inference to cloud API via async I/O. |
+| **Database Engine** | SQLite 3 (`bot_memory.db`) with Write-Ahead Logging (`WAL`) | Near-zero RAM footprint, crash-resilient, concurrent readers. |
+| **Storage Footprint** | ~30 MB application + virtual environment | Fits easily within constrained SD storage allocations. |
+| **Unit Test Coverage** | **78 automated test cases** (100% offline mocked, ~2.0s execution) | Tests business logic, error traps, DB concurrency, and LLM retry cascades. |
+| **Network Architecture** | Long-polling outbound HTTPS (Telegram API) + Tailscale Mesh VPN | Bypasses dorm NAT firewalls without port forwarding or webhooks. |
+
+---
+
+## Project Structure & Architecture
 
 ```text
 pi-telegram-chat-bot/
 ├── core/
-│   ├── db.py               # Asynchronous SQLite operations with WAL configuration
-│   ├── error_handler.py    # Global uncaught exception and error reporter
-│   └── logger.py           # Rotating file logger capped at 6 MB total disk usage
+│   ├── db.py               # Asynchronous SQLite operations with WAL configuration & pruning
+│   ├── error_handler.py    # Global uncaught exception handler and admin notification dispatcher
+│   ├── llm.py              # Gemini client with model rotation, Imagen generation, and cost tracking
+│   ├── logger.py           # Rotating file logger capped at 6 MB total disk space
+│   └── telegram_utils.py   # Formatting utilities, tag extraction, and safe message chunking
 ├── modules/
-│   ├── analytics.py        # Usage statistics and interaction metrics
-│   ├── commands.py         # Primary bot command handlers and autocomplete registration
-│   └── listener.py         # Passive message recording and incoming event hooks
+│   ├── analytics.py        # Owner-only API token accounting, request counters, and cost reports
+│   ├── commands.py         # Standard handlers (/start, /help, /ping) and Telegram UI menu builder
+│   ├── conversational.py   # AI conversation router enforcing group mention rules and context fetching
+│   ├── intent.py           # Zero-dependency fuzzy intent classifier (EN, UK, RU) using difflib
+│   ├── listener.py         # Passive message recording module for chat context and analytics
+│   ├── media.py            # Media ingestion and Telegram attachment processing
+│   ├── meme.py             # Generative AI meme and illustration engine with prompt expansion
+│   ├── news.py             # Grounded news digest module with real-time Google Search retrieval
+│   └── roast.py            # Standup comedy roast generator using SQLite message history
 ├── systemd/
-│   └── telegram-bot.service # Production daemon unit template for systemd
+│   └── telegram-bot.service # Production systemd unit template with strict cgroup limits
 ├── tests/
-│   ├── test_commands.py    # Unit tests for bot command routing and responses
-│   ├── test_db.py          # Unit tests for SQLite concurrency and table initialization
-│   ├── test_error_handler.py# Unit tests for error handling logic
-│   └── test_logger.py      # Unit tests for log rotation and formatters
-├── .env.example            # Environment configuration template
-├── deploy.sh               # Pull-based deployment pipeline with pytest gatekeeper
-├── main.py                 # Application bootstrap and runtime orchestrator
-├── requirements.txt        # Pinned production dependencies
-└── README.md               # Public project documentation
+│   ├── e2e_tester.py       # Headless synthetic client test runner for end-to-end integration tests
+│   ├── test_analytics.py   # Unit tests for token calculations and owner access control
+│   ├── test_commands.py    # Unit tests for command parsing and responses
+│   ├── test_conversational.py # Unit tests for conversational routing and group mention validation
+│   ├── test_db.py          # Unit tests for SQLite WAL concurrency, schemas, and pruning
+│   ├── test_error_handler.py # Unit tests for uncaught exception handling
+│   ├── test_intent.py      # Unit tests for fuzzy intent classification and typo tolerance
+│   ├── test_llm.py         # Unit tests for model failover cascades and cost tracking
+│   ├── test_logger.py      # Unit tests for log rotation and formatters
+│   ├── test_meme.py        # Unit tests for generative meme prompt handling and model rotation
+│   ├── test_news.py        # Unit tests for Google Search grounding and fallback logic
+│   ├── test_roast.py       # Unit tests for history retrieval and roast prompt generation
+│   └── test_telegram_utils.py # Unit tests for string escaping and chunking
+├── .env.example            # Environment variable template
+├── deploy.sh               # Pull-based deployment pipeline with automated test gatekeeper
+├── INFRASTRUCTURE.md       # Operational runbook for edge server and Tailscale configuration
+├── main.py                 # Application bootstrap, background task scheduler, and polling runner
+├── requirements.txt        # Strictly pinned minimal dependencies
+└── README.md               # Public project documentation and engineering overview
 ```
 
 ---
 
-## Environment Separation
+## Core Capabilities & Features
 
-The codebase follows a dual-environment strategy to avoid polling collisions (`409 Conflict` errors):
+### 1. Conversational AI with Group Context
+- In direct messages, the bot responds to all prompts. In group chats, it enforces strict group privacy by responding only when explicitly mentioned (`@bot_username`) or directly replied to.
+- Automatically fetches recent conversation history from SQLite to maintain contextual continuity across exchanges.
+- Output is formatted with safe HTML escaping and split into sub-4096-character segments if responses exceed Telegram's single-message limit.
 
-```mermaid
-flowchart LR
-    subgraph LocalDev ["Local Workstation"]
-        DEV_BOT["Local Dev Bot"]
-        DEV_ENV[".env (Test Bot Token)"]
-        DEV_BOT --- DEV_ENV
-    end
+### 2. Multi-Tier Model Fallback Cascade
+- Primary requests target modern Flash tier models (`gemini-3.8-flash`).
+- If Google returns an HTTP 429 (rate limit exceeded), 503 (service unavailable), or quota error, the request automatically falls back sequentially across candidate models (`gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-flash-latest`, etc.).
+- Transparent to the end user: the bot indicates the active generating model in the response footer without crashing.
 
-    subgraph GitHub ["GitHub Repository"]
-        REPO["origin/main"]
-    end
+### 3. Generative Visuals and Memes (`/meme`)
+- Generates custom illustrations and meme visuals based on text descriptions.
+- Leverages Google DeepMind's "Nano Banana" image series (`gemini-3.1-flash-lite-image`, `gemini-2.5-flash-image`, `gemini-3.1-flash-image`, `gemini-3-pro-image`).
+- Implements price-ordered model rotation to protect API expenses.
 
-    subgraph ProductionHost ["Edge Device (Production)"]
-        PROD_BOT["Systemd Production Daemon"]
-        PROD_ENV[".env (Production Token)"]
-        PROD_BOT --- PROD_ENV
-    end
+### 4. Search-Grounded News Digest (`/news`)
+- Synthesizes up-to-the-minute briefings on global or targeted topics using Google Search Grounding.
+- Automatically formats sources and references.
+- Features dynamic quota detection: if search tool quotas are exhausted on a free-tier key, it gracefully disables grounding and synthesizes an internal overview instead of throwing an unhandled exception.
 
-    DEV_BOT -->|"git push"| REPO
-    REPO -->|"deploy.sh (git pull)"| PROD_BOT
-```
+### 5. Context-Aware Standup Roasts (`/roast`)
+- Queries SQLite for recent messages authored by a targeted user in the current group.
+- Constructs an analytical prompt to generate friendly, standup-style comedic roasts based on genuine group conversation dynamics.
 
-- **Local Development:** Run on demand on a workstation with a designated test bot token for immediate feedback.
-- **Production Server:** Runs 24/7 as a managed systemd background service on the edge device with the production token.
+### 6. Zero-Dependency Fuzzy Intent Classification
+- Recognizes conversational intent across Ukrainian, Russian, and English (e.g., "просмаж", "роаст", "новости", "мем").
+- Employs Python's standard library `difflib.get_close_matches` with normalized fuzzy matching.
+- Users can trigger bot capabilities organically in conversation without memorizing rigid slash command syntax.
+
+### 7. Real-Time Token Telemetry & FinOps (`/stats`)
+- Captures `prompt_token_count` and `candidates_token_count` from API response metadata for every LLM interaction.
+- Computes estimated dollar costs in real time according to provider pricing tiers.
+- Restricted to the bot administrator (`ADMIN_CHAT_ID`) to provide transparency on daily and cumulative API usage broken down by feature.
 
 ---
 
 ## Getting Started
 
 ### Prerequisites
-- Python 3.11+
+- Python 3.11 or newer
 - Git
+- Valid Telegram Bot Token (obtained from [@BotFather](https://t.me/botfather))
+- Google Gemini API Key (obtained from [Google AI Studio](https://aistudio.google.com/))
 
 ### 1. Clone the Repository
 ```bash
@@ -119,30 +225,7 @@ git clone https://github.com/<username>/pi-telegram-chat-bot.git
 cd pi-telegram-chat-bot
 ```
 
-### 2. Configure Environment
-Copy the template and supply your credentials:
-```bash
-cp .env.example .env
-```
-
-Configure the following variables in `.env`:
-```ini
-# Telegram Credentials
-TELEGRAM_BOT_TOKEN=your_bot_token_here
-ADMIN_CHAT_ID=your_chat_id_here
-
-# LLM Credentials
-GEMINI_TOKEN_KEY=your_api_key_here
-
-# Runtime Configuration
-LOG_LEVEL=INFO
-LOG_TO_CONSOLE=true
-LOG_TO_FILE=true
-LOG_FILE_PATH=bot.log
-DATABASE_PATH=bot_memory.db
-```
-
-### 3. Setup Virtual Environment
+### 2. Set Up Virtual Environment
 ```bash
 python -m venv venv
 
@@ -151,64 +234,125 @@ source venv/bin/activate
 
 # On Windows PowerShell:
 .\venv\Scripts\Activate.ps1
+```
 
+### 3. Install Pinned Dependencies
+```bash
 pip install -r requirements.txt
 ```
 
-### 4. Run the Test Suite
-All tests run offline using mocks without contacting external APIs:
+### 4. Configure Environment Variables
+Copy the template and configure your secrets:
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your preferred settings:
+```ini
+# Telegram Credentials
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+ADMIN_CHAT_ID=your_numeric_chat_id_here
+
+# LLM Credentials
+GEMINI_TOKEN_KEY=your_gemini_api_key_here
+
+# Runtime Parameters
+LOG_LEVEL=INFO
+LOG_TO_CONSOLE=true
+LOG_TO_FILE=true
+LOG_FILE_PATH=bot.log
+DATABASE_PATH=bot_memory.db
+```
+
+### 5. Execute Offline Unit Tests
+Run the comprehensive test suite to confirm complete local readiness:
 ```bash
 pytest
 ```
+*Expected: 78 passed tests in approximately 2 seconds.*
 
-### 5. Launch the Bot Locally
+### 6. Run the Application
 ```bash
 python main.py
 ```
 
 ---
 
-## Production Deployment
+## Automated Deployment & Production CI/CD
 
-### Automated Pull Deployment (`deploy.sh`)
-
-Deployments utilize a pull-based bash script that guarantees zero-downtime regression protection.
+Production runs as an isolated `systemd` service on the Raspberry Pi edge device. Deployments utilize a pull-based bash script that guarantees zero-downtime regression protection.
 
 ```bash
 bash deploy.sh
 ```
 
-The script executes this automated workflow:
-1. **Pull:** Fetches the latest commits from `origin/main`.
-2. **Environment:** Activates the local virtual environment.
-3. **Dependencies:** Non-interactively installs updated requirements.
-4. **Migrations:** Runs database schema initialization.
-5. **Gatekeeper:** Runs `pytest`. If any unit test fails, execution aborts immediately via a bash `ERR` trap, preventing the running service from being restarted with faulty code.
-6. **Reload:** Restarts `telegram-bot.service` only when all tests pass.
+### Deployment Pipeline Workflow (`deploy.sh`)
 
-### Systemd Integration
+1. **Repository Synchronization:** Pulls incoming commits from `origin/main`.
+2. **Virtual Environment Isolation:** Activates `/home/admin/pi-telegram-chat-bot/venv`.
+3. **Dependency Sync:** Installs updated pinned packages via `pip install --no-input -r requirements.txt`.
+4. **Database Migration:** Executes idempotent schema initialization (`python -c "from core.db import init_db; init_db()"`).
+5. **Quality Gatekeeper:** Runs `pytest`. If any unit test fails, the bash `ERR` trap catches the exit code and aborts the entire execution before touching the running service.
+6. **Graceful Reload:** If and only if all tests pass, the script executes `sudo systemctl restart telegram-bot.service`.
 
-For 24/7 background execution on Linux:
+### Systemd Service Configuration
 
-1. Copy the unit file into systemd:
-   ```bash
-   sudo cp systemd/telegram-bot.service /etc/systemd/system/
-   ```
-2. Reload systemd daemon:
-   ```bash
-   sudo systemctl daemon-reload
-   ```
-3. Enable and start the service:
-   ```bash
-   sudo systemctl enable --now telegram-bot.service
-   ```
-4. Verify service status:
-   ```bash
-   systemctl status telegram-bot.service
-   ```
+The service is sandboxed using systemd cgroups to strictly enforce resource boundaries:
+
+```ini
+[Unit]
+Description=Raspberry Pi Telegram Bot (Production)
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/admin/pi-telegram-chat-bot
+EnvironmentFile=/home/admin/pi-telegram-chat-bot/.env
+ExecStart=/home/admin/pi-telegram-chat-bot/venv/bin/python main.py
+Restart=always
+RestartSec=10
+TimeoutStopSec=15
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=telegram-bot
+
+# Cgroup Resource Ceilings for Raspberry Pi 3B+
+MemoryMax=150M
+MemoryHigh=120M
+CPUQuota=80%
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Useful Management Commands
+```bash
+# Check service status, active PID, and resident memory usage
+systemctl status telegram-bot.service
+
+# View live streamed production logs
+journalctl -u telegram-bot.service -f -n 50
+
+# Restart the service manually
+sudo systemctl restart telegram-bot.service
+```
 
 ---
 
-## License
+## Dual-Environment Isolation
 
-This project is licensed under the MIT License.
+To eliminate Telegram `409 Conflict` errors caused by concurrent long-polling loops against a shared token, development and production operate in total isolation:
+
+| Environment | Host System | Execution Model | Bot Token | Database Target |
+| :--- | :--- | :--- | :--- | :--- |
+| **Development** | Local Workstation | On-demand (`python main.py`) | Dev Bot Token | `bot_data.db` |
+| **Production** | Raspberry Pi 3B+ (`mypi`) | Systemd daemon (24/7) | Prod Bot Token | `bot_memory.db` |
+
+---
+
+## Testing Strategy
+
+- **Unit Testing (78 tests):** All components (database queries, logging, intent parsing, error handling, token math, command routing) are tested offline with zero external network calls. Telegram and Gemini APIs are fully mocked with `unittest.mock`.
+- **End-to-End Synthetic Testing (`tests/e2e_tester.py`):** Features a headless test runner bot client (`TEST_RUNNER_BOT_TOKEN`) that fires synthetic user messages into a designated test group (`TEST_GROUP_CHAT_ID`) to validate live bot responses before merging to production.

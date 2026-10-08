@@ -75,6 +75,14 @@ def test_markdown_to_telegram_html_links() -> None:
     assert '<a href="https://news.google.com">новини</a>' in converted
 
 
+def test_markdown_to_telegram_html_preserves_existing_code_tags() -> None:
+    """Verifies that pre-existing <code> tags are preserved without being escaped to literal text."""
+    input_text = "наприклад: <code>/roast @username</code>, або надішліть команду"
+    converted = markdown_to_telegram_html(input_text)
+    assert "<code>/roast @username</code>" in converted
+    assert "&lt;code&gt;" not in converted
+
+
 def test_send_formatted_reply_success() -> None:
     """Verifies that send_formatted_reply calls reply_text with ParseMode.HTML."""
     mock_message = MagicMock(spec=Message)

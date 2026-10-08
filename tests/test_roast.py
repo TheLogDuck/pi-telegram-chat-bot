@@ -126,6 +126,8 @@ def test_roast_command_no_target_shows_help() -> None:
     update.effective_message.reply_text.assert_awaited_once()
     args, kwargs = update.effective_message.reply_text.call_args
     assert "Кому саме влаштувати прожарку?" in args[0]
+    assert "<code>/roast @username</code>" in args[0]
+    assert "&lt;code&gt;" not in args[0]
     assert kwargs.get("parse_mode") == ParseMode.HTML
 
 
