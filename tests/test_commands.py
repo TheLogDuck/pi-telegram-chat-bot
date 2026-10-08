@@ -51,14 +51,33 @@ def test_ping_command() -> None:
 
     mock_update.effective_message.reply_text.assert_awaited_once_with(PING_TEXT)
 
-def test_stats_command() -> None:
-    """Verifies that /stats sends operational status."""
+def test_stats_command_non_owner(monkeypatch) -> None:
+    """Verifies that /stats denies access to unauthorized non-owner users."""
+    monkeypatch.setenv("ADMIN_CHAT_ID", "12345")
     mock_update = make_mock_update()
+    mock_update.effective_user.id = 99999
     mock_context = MagicMock()
 
     asyncio.run(stats_command(mock_update, mock_context))
 
-    mock_update.effective_message.reply_text.assert_awaited_once_with("Аналітика: система працює у штатному режимі.")
+    mock_update.effective_message.reply_text.assert_awaited_once_with(
+        "Ця команда доступна виключно адміністратору бота."
+    )
+
+
+def test_stats_command_owner(monkeypatch) -> None:
+    """Verifies that /stats returns usage report for the configured owner."""
+    monkeypatch.setenv("ADMIN_CHAT_ID", "12345")
+    mock_update = make_mock_update()
+    mock_update.effective_user.id = 12345
+    mock_context = MagicMock()
+
+    asyncio.run(stats_command(mock_update, mock_context))
+
+    assert mock_update.effective_message.reply_text.await_count == 1
+    call_args = mock_update.effective_message.reply_text.await_args
+    assert "Статистика використання Gemini API" in call_args[0][0]
+
 
 def test_set_bot_commands() -> None:
     """Verifies that set_bot_commands sends the BOT_COMMANDS list to Telegram."""

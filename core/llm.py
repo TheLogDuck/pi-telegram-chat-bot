@@ -22,6 +22,51 @@ MODEL_ROTATION_CANDIDATES = [
 # On Free Tier accounts, this disables cleanly on the first 429 to avoid retry storms.
 _search_grounding_available = os.getenv("ENABLE_SEARCH_GROUNDING", "true").lower() in ("true", "1", "yes")
 
+# Flash model pay-as-you-go rates per 1,000,000 tokens (USD)
+FLASH_INPUT_COST_PER_MILLION = 0.10
+FLASH_OUTPUT_COST_PER_MILLION = 0.40
+
+
+async def record_usage(
+    response: object,
+    model_name: str,
+    feature: str,
+    chat_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+) -> None:
+    """Extracts usage metadata from Gemini response and logs it to SQLite."""
+    usage = getattr(response, "usage_metadata", None)
+    if not usage:
+        return
+
+    prompt_tokens = getattr(usage, "prompt_token_count", 0) or 0
+    completion_tokens = getattr(usage, "candidates_token_count", 0) or 0
+    total_tokens = getattr(usage, "total_token_count", prompt_tokens + completion_tokens) or 0
+
+    # Compute estimated cost based on token counts
+    cost_usd = (
+        (prompt_tokens * FLASH_INPUT_COST_PER_MILLION)
+        + (completion_tokens * FLASH_OUTPUT_COST_PER_MILLION)
+    ) / 1_000_000.0
+
+    try:
+        from core.db import async_save_token_usage
+
+        await async_save_token_usage(
+            model=model_name,
+            feature=feature,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            cost_usd=cost_usd,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+    except Exception as exc:
+        # Prevent telemetry logging errors from blocking AI replies
+        logger.warning(f"Failed to record token usage: {exc}")
+
+
 
 def get_candidate_models() -> list[str]:
     """Returns ordered list of models for automatic failover and quota rotation."""
@@ -64,6 +109,8 @@ async def generate_response(
     prompt: str,
     system_instruction: Optional[str] = None,
     client: Optional[genai.Client] = None,
+    chat_id: Optional[int] = None,
+    user_id: Optional[int] = None,
 ) -> str:
     """Asynchronously generates a text response from the Gemini model.
 
@@ -71,6 +118,8 @@ async def generate_response(
         prompt: The user query or conversation context.
         system_instruction: Optional override for the bot persona instruction.
         client: Optional injected client (useful for unit testing and mocking).
+        chat_id: Optional Telegram chat identifier for telemetry attribution.
+        user_id: Optional Telegram user identifier for telemetry attribution.
 
     Returns:
         The generated response string in Ukrainian, or a friendly error message.
@@ -96,6 +145,8 @@ async def generate_response(
                 config=config,
             )
             if response and response.text:
+                # Log token usage asynchronously to avoid blocking user response
+                await record_usage(response, model_name, "chat", chat_id, user_id)
                 return response.text.strip()
             logger.warning(f"Model {model_name} returned empty text.")
         except Exception as exc:
@@ -120,6 +171,8 @@ NEWS_SYSTEM_INSTRUCTION = (
 async def generate_news_briefing(
     topic: Optional[str] = None,
     client: Optional[genai.Client] = None,
+    chat_id: Optional[int] = None,
+    user_id: Optional[int] = None,
 ) -> str:
     """Asynchronously generates a news briefing grounded with Google Search.
 
@@ -128,6 +181,8 @@ async def generate_news_briefing(
     Args:
         topic: Optional subject filter (e.g. 'технології', 'штучний інтелект').
         client: Optional injected client for unit testing.
+        chat_id: Optional Telegram chat identifier for telemetry attribution.
+        user_id: Optional Telegram user identifier for telemetry attribution.
 
     Returns:
         Structured news briefing in Ukrainian, or a friendly error message.
@@ -161,6 +216,7 @@ async def generate_news_briefing(
                     config=config,
                 )
                 if response and response.text:
+                    await record_usage(response, model_name, "news", chat_id, user_id)
                     return response.text.strip()
                 logger.warning(f"Model {model_name} returned empty text for news briefing.")
             except Exception as exc:
@@ -185,6 +241,7 @@ async def generate_news_briefing(
                 config=standard_config,
             )
             if response and response.text:
+                await record_usage(response, model_name, "news", chat_id, user_id)
                 return response.text.strip()
         except Exception as exc:
             logger.warning(f"Standard news generation with {model_name} failed: {exc}")
@@ -209,6 +266,8 @@ async def generate_roast(
     target_name: str,
     context_messages: Optional[list[str]] = None,
     client: Optional[genai.Client] = None,
+    chat_id: Optional[int] = None,
+    user_id: Optional[int] = None,
 ) -> str:
     """Generates a witty standup comedy roast of a user in Ukrainian.
 
@@ -216,6 +275,8 @@ async def generate_roast(
         target_name: The username or display name of the user being roasted.
         context_messages: Optional recent messages sent by the user for context.
         client: Optional injected Gemini client for unit testing.
+        chat_id: Optional Telegram chat identifier for telemetry attribution.
+        user_id: Optional Telegram user identifier for telemetry attribution.
 
     Returns:
         A humorous roast in Ukrainian, or a friendly fallback message on failure.
@@ -251,6 +312,7 @@ async def generate_roast(
                 config=config,
             )
             if response and response.text:
+                await record_usage(response, model_name, "roast", chat_id, user_id)
                 return response.text.strip()
             logger.warning(f"Model {model_name} returned empty roast text.")
         except Exception as exc:

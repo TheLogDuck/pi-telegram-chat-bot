@@ -73,3 +73,55 @@ def test_get_user_messages_filtering_and_order(tmp_path):
     # Test query by user_id
     id_messages = get_user_messages(chat_id=100, user_id=2, limit=5, db_path=test_db)
     assert id_messages == ["Повідомлення від Боба"]
+
+
+def test_save_and_get_token_usage_stats(tmp_path):
+    """Verifies that token usage records are saved and aggregated accurately."""
+    from core.db import async_save_token_usage, get_token_usage_stats, save_token_usage
+
+    test_db = str(tmp_path / "test_memory.db")
+    init_db(test_db)
+
+    # Insert initial chat usage record
+    save_token_usage(
+        model="gemini-3.8-flash",
+        feature="chat",
+        prompt_tokens=100,
+        completion_tokens=200,
+        total_tokens=300,
+        cost_usd=0.00009,
+        chat_id=123,
+        user_id=456,
+        db_path=test_db,
+    )
+
+    # Insert another record asynchronously
+    asyncio.run(
+        async_save_token_usage(
+            model="gemini-3.8-flash",
+            feature="news",
+            prompt_tokens=150,
+            completion_tokens=350,
+            total_tokens=500,
+            cost_usd=0.000155,
+            chat_id=123,
+            user_id=456,
+            db_path=test_db,
+        )
+    )
+
+    stats = get_token_usage_stats(db_path=test_db)
+
+    # Verify aggregated totals
+    assert stats["today"]["calls"] == 2
+    assert stats["today"]["total_tokens"] == 800
+    assert stats["today"]["prompt_tokens"] == 250
+    assert stats["today"]["completion_tokens"] == 550
+    assert stats["total"]["calls"] == 2
+
+    # Verify feature breakdown
+    assert "chat" in stats["by_feature"]
+    assert stats["by_feature"]["chat"]["tokens"] == 300
+    assert "news" in stats["by_feature"]
+    assert stats["by_feature"]["news"]["tokens"] == 500
+

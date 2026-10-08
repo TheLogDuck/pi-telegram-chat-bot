@@ -203,3 +203,36 @@ def test_generate_roast_handles_failure() -> None:
 
     result = asyncio.run(generate_roast("alice", client=mock_client))
     assert result == API_ERROR_MESSAGE
+
+
+def test_record_usage_calculates_cost() -> None:
+    """Verifies that record_usage parses usage_metadata and calculates USD cost."""
+    from core.llm import record_usage
+
+    mock_response = MagicMock()
+    mock_usage = MagicMock()
+    mock_usage.prompt_token_count = 1000
+    mock_usage.candidates_token_count = 500
+    mock_usage.total_token_count = 1500
+    mock_response.usage_metadata = mock_usage
+
+    with patch("core.db.async_save_token_usage", new_callable=AsyncMock) as mock_save:
+        asyncio.run(
+            record_usage(
+                response=mock_response,
+                model_name="gemini-3.8-flash",
+                feature="chat",
+                chat_id=123,
+                user_id=456,
+            )
+        )
+        mock_save.assert_awaited_once()
+        call_kwargs = mock_save.await_args.kwargs
+        assert call_kwargs["model"] == "gemini-3.8-flash"
+        assert call_kwargs["feature"] == "chat"
+        assert call_kwargs["prompt_tokens"] == 1000
+        assert call_kwargs["completion_tokens"] == 500
+        assert call_kwargs["total_tokens"] == 1500
+        # 1000 * 0.10/1M + 500 * 0.40/1M = 0.0001 + 0.0002 = 0.0003
+        assert abs(call_kwargs["cost_usd"] - 0.0003) < 1e-6
+
