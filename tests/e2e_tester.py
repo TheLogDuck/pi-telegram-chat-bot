@@ -48,6 +48,26 @@ TEST_SCENARIOS: List[Tuple[str, str, str]] = [
         "Expected: Bot understands Russian and replies strictly in Ukrainian.",
     ),
     (
+        "News Slash Command (/news [topic])",
+        "{bot} /news штучний інтелект",
+        "Expected: Typing action followed by rendered HTML news summary in Ukrainian.",
+    ),
+    (
+        "Natural Language News Query",
+        "{bot} розкажи останні новини про космос",
+        "Expected: Trilingual intent matches NEWS and invokes news_command.",
+    ),
+    (
+        "Roast Slash Command (/roast @user)",
+        "{bot} /roast @SketchyIntelligenceTestBot",
+        "Expected: Typing action followed by witty standup comedy roast in Ukrainian.",
+    ),
+    (
+        "Natural Language Roast Trigger",
+        "{bot} просмаж @SketchyIntelligenceTestBot",
+        "Expected: Trilingual intent matches ROAST and invokes roast_command.",
+    ),
+    (
         "Group Privacy Check (Untagged Message)",
         "Це тестове повідомлення без тегу бота. Бот не повинен відповідати.",
         "Expected: Bot remains completely silent and only records to SQLite.",
