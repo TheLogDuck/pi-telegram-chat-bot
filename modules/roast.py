@@ -7,7 +7,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from core.db import async_get_user_messages
 from core.llm import generate_roast
 from core.logger import setup_logger
-from core.telegram_utils import is_bot_mentioned, send_formatted_reply
+from core.telegram_utils import format_reply_with_model, is_bot_mentioned, send_formatted_reply
 
 logger = setup_logger("roast")
 
@@ -75,13 +75,17 @@ async def roast_command(
     )
 
     # Step 3: Generate the humorous Ukrainian standup roast
-    roast_text = await generate_roast(
+    result = await generate_roast(
         target_name=target_name,
         context_messages=context_messages,
     )
+    if isinstance(result, tuple):
+        roast_text, model_used = result
+    else:
+        roast_text, model_used = result, None
 
-    # Step 4: Deliver the roast with formatted HTML and safe fallback
-    await send_formatted_reply(message, roast_text)
+    # Step 4: Deliver the roast with formatted HTML and model attribution
+    await send_formatted_reply(message, format_reply_with_model(roast_text, model_used))
 
 
 def register_roast(app: Application) -> None:

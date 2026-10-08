@@ -48,7 +48,7 @@ def test_roast_command_with_explicit_arg(
 ) -> None:
     """Verifies roast command when target user is provided in context.args."""
     mock_db.return_value = ["люблю каву", "знову дедлайн"]
-    mock_generate.return_value = "**Роаст @developer:** Забагато кави!"
+    mock_generate.return_value = ("**Роаст @developer:** Забагато кави!", "gemini-3.8-flash")
 
     update = make_roast_update("/roast @developer")
     context = MagicMock()
@@ -72,7 +72,7 @@ def test_roast_command_with_explicit_arg(
         context_messages=["люблю каву", "знову дедлайн"],
     )
     update.effective_message.reply_text.assert_awaited_once_with(
-        "<b>Роаст @developer:</b> Забагато кави!",
+        "<b>Роаст @developer:</b> Забагато кави!\n\nМодель: gemini-3.8-flash",
         parse_mode=ParseMode.HTML,
     )
 
@@ -85,7 +85,7 @@ def test_roast_command_from_reply_message(
 ) -> None:
     """Verifies roast command targets author of replied-to message."""
     mock_db.return_value = []
-    mock_generate.return_value = "**Роаст @victim:** Привіт жертві!"
+    mock_generate.return_value = ("**Роаст @victim:** Привіт жертві!", "gemini-3.8-flash")
 
     target_user = MagicMock(spec=User)
     target_user.id = 888
@@ -107,6 +107,10 @@ def test_roast_command_from_reply_message(
     mock_generate.assert_awaited_once_with(
         target_name="victim",
         context_messages=[],
+    )
+    update.effective_message.reply_text.assert_awaited_once_with(
+        "<b>Роаст @victim:</b> Привіт жертві!\n\nМодель: gemini-3.8-flash",
+        parse_mode=ParseMode.HTML,
     )
 
 

@@ -6,7 +6,7 @@ from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 from core.llm import generate_news_briefing
 from core.logger import setup_logger
-from core.telegram_utils import is_bot_mentioned, send_formatted_reply
+from core.telegram_utils import format_reply_with_model, is_bot_mentioned, send_formatted_reply
 
 logger = setup_logger("news")
 
@@ -47,10 +47,14 @@ async def news_command(
         logger.warning(f"Failed to send typing action for news briefing: {exc}")
 
     # Generate the grounded briefing via the non-blocking Gemini wrapper
-    briefing = await generate_news_briefing(topic=topic)
+    result = await generate_news_briefing(topic=topic)
+    if isinstance(result, tuple):
+        briefing, model_used = result
+    else:
+        briefing, model_used = result, None
 
-    # Send the structured news summary back with HTML formatting rendered
-    await send_formatted_reply(message, briefing)
+    # Send the structured news summary back with HTML formatting rendered and model attribution
+    await send_formatted_reply(message, format_reply_with_model(briefing, model_used))
 
 
 def register_news(app: Application) -> None:

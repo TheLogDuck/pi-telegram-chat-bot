@@ -43,9 +43,9 @@ def test_meme_command_no_prompt() -> None:
 
 @patch("modules.meme.generate_meme_image", new_callable=AsyncMock)
 def test_meme_command_success_with_args(mock_generate: AsyncMock) -> None:
-    """Verifies that meme_command streams generated photo upon success."""
+    """Verifies that meme_command streams generated photo upon success with model footer."""
     fake_png_bytes = b"\x89PNG\r\n\x1a\nfakeimagecontent"
-    mock_generate.return_value = (fake_png_bytes, "image/png", None)
+    mock_generate.return_value = (fake_png_bytes, "image/png", None, "gemini-2.5-flash-image")
 
     update = make_meme_update("/meme funny cat on pi")
     context = MagicMock()
@@ -65,7 +65,7 @@ def test_meme_command_success_with_args(mock_generate: AsyncMock) -> None:
     )
     update.effective_message.reply_photo.assert_awaited_once()
     call_kwargs = update.effective_message.reply_photo.await_args.kwargs
-    assert call_kwargs["caption"] == "Мем: funny cat on pi"
+    assert call_kwargs["caption"] == "Мем: funny cat on pi\n\nМодель: gemini-2.5-flash-image"
     assert call_kwargs["photo"].read() == fake_png_bytes
 
 
@@ -73,7 +73,7 @@ def test_meme_command_success_with_args(mock_generate: AsyncMock) -> None:
 def test_meme_command_injected_prompt(mock_generate: AsyncMock) -> None:
     """Verifies that an injected prompt from conversational intent is used."""
     fake_bytes = b"image-data"
-    mock_generate.return_value = (fake_bytes, "image/png", None)
+    mock_generate.return_value = (fake_bytes, "image/png", None, "gemini-2.5-flash-image")
 
     update = make_meme_update("@bot мем про програмування")
     context = MagicMock()
@@ -88,12 +88,14 @@ def test_meme_command_injected_prompt(mock_generate: AsyncMock) -> None:
         user_id=777,
     )
     update.effective_message.reply_photo.assert_awaited_once()
+    call_kwargs = update.effective_message.reply_photo.await_args.kwargs
+    assert call_kwargs["caption"] == "Мем: програмування\n\nМодель: gemini-2.5-flash-image"
 
 
 @patch("modules.meme.generate_meme_image", new_callable=AsyncMock)
 def test_meme_command_failure_fallback(mock_generate: AsyncMock) -> None:
     """Verifies that meme_command sends text error if image generation fails."""
-    mock_generate.return_value = (None, None, "Помилка генерації")
+    mock_generate.return_value = (None, None, "Помилка генерації", None)
 
     update = make_meme_update("/meme bad prompt")
     context = MagicMock()

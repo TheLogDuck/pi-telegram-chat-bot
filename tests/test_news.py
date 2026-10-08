@@ -27,7 +27,7 @@ def make_news_update(text: str = "/news") -> MagicMock:
 @patch("modules.news.generate_news_briefing", new_callable=AsyncMock)
 def test_news_command_with_explicit_topic(mock_generate: AsyncMock) -> None:
     """Verifies that news_command passes the explicit topic to generate_news_briefing."""
-    mock_generate.return_value = "1. Новини штучного інтелекту..."
+    mock_generate.return_value = ("1. Новини штучного інтелекту...", "gemini-3.8-flash")
     update = make_news_update("/news AI")
     context = MagicMock()
     context.bot.send_chat_action = AsyncMock()
@@ -41,7 +41,7 @@ def test_news_command_with_explicit_topic(mock_generate: AsyncMock) -> None:
     )
     mock_generate.assert_awaited_once_with(topic="штучний інтелект")
     update.effective_message.reply_text.assert_awaited_once_with(
-        "1. Новини штучного інтелекту...",
+        "1. Новини штучного інтелекту...\n\nМодель: gemini-3.8-flash",
         parse_mode=ParseMode.HTML,
     )
 
@@ -49,7 +49,7 @@ def test_news_command_with_explicit_topic(mock_generate: AsyncMock) -> None:
 @patch("modules.news.generate_news_briefing", new_callable=AsyncMock)
 def test_news_command_with_context_args(mock_generate: AsyncMock) -> None:
     """Verifies topic extraction from context.args when topic argument is None."""
-    mock_generate.return_value = "1. Новини космосу..."
+    mock_generate.return_value = ("1. Новини космосу...", "gemini-3.8-flash")
     update = make_news_update("/news space tech")
     context = MagicMock()
     context.bot.send_chat_action = AsyncMock()
@@ -59,7 +59,7 @@ def test_news_command_with_context_args(mock_generate: AsyncMock) -> None:
 
     mock_generate.assert_awaited_once_with(topic="space tech")
     update.effective_message.reply_text.assert_awaited_once_with(
-        "1. Новини космосу...",
+        "1. Новини космосу...\n\nМодель: gemini-3.8-flash",
         parse_mode=ParseMode.HTML,
     )
 
@@ -67,7 +67,7 @@ def test_news_command_with_context_args(mock_generate: AsyncMock) -> None:
 @patch("modules.news.generate_news_briefing", new_callable=AsyncMock)
 def test_news_command_default_headlines(mock_generate: AsyncMock) -> None:
     """Verifies that news_command without arguments generates default headlines."""
-    mock_generate.return_value = "1. Головні новини..."
+    mock_generate.return_value = ("1. Головні новини...", "gemini-3.8-flash")
     update = make_news_update("/news")
     context = MagicMock()
     context.bot.send_chat_action = AsyncMock()
@@ -77,7 +77,7 @@ def test_news_command_default_headlines(mock_generate: AsyncMock) -> None:
 
     mock_generate.assert_awaited_once_with(topic=None)
     update.effective_message.reply_text.assert_awaited_once_with(
-        "1. Головні новини...",
+        "1. Головні новини...\n\nМодель: gemini-3.8-flash",
         parse_mode=ParseMode.HTML,
     )
 

@@ -109,8 +109,8 @@ def test_conversational_handler_empty_tag_greeting() -> None:
 
 @patch("modules.conversational.generate_response", new_callable=AsyncMock)
 def test_conversational_handler_tagged_generates_ai_response(mock_generate: AsyncMock) -> None:
-    """Verifies typing action and Gemini generation when tagged with a question."""
-    mock_generate.return_value = "Це чудове запитання про науку."
+    """Verifies typing action and Gemini generation with model attribution."""
+    mock_generate.return_value = ("Це чудове запитання про науку.", "gemini-3.8-flash")
     update = make_chat_update(ChatType.GROUP, "@my_bot розкажи про зорі")
     context = MagicMock()
     context.bot.username = "my_bot"
@@ -125,7 +125,7 @@ def test_conversational_handler_tagged_generates_ai_response(mock_generate: Asyn
     )
     mock_generate.assert_awaited_once_with("розкажи про зорі")
     update.effective_message.reply_text.assert_awaited_once_with(
-        "Це чудове запитання про науку.",
+        "Це чудове запитання про науку.\n\nМодель: gemini-3.8-flash",
         parse_mode=ParseMode.HTML,
     )
 

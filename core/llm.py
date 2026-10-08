@@ -19,12 +19,13 @@ MODEL_ROTATION_CANDIDATES = [
 ]
 
 # Image generation models ("Nano Banana" series from Google DeepMind)
-DEFAULT_IMAGE_MODEL = "gemini-2.5-flash-image"
+# Ordered strictly from cheapest to priciest per image
+DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-lite-image"
 IMAGE_MODEL_ROTATION_CANDIDATES = [
-    "gemini-2.5-flash-image",       # Nano Banana (500 RPM, 2K RPD)
-    "gemini-3.1-flash-image",       # Nano Banana 2 (100 RPM, 1K RPD)
-    "gemini-3.1-flash-lite-image",  # Nano Banana 2 Lite (150 RPM, 1K RPD)
-    "gemini-3-pro-image",           # Nano Banana Pro (20 RPM, 250 RPD)
+    "gemini-3.1-flash-lite-image",
+    "gemini-2.5-flash-image",
+    "gemini-3.1-flash-image",
+    "gemini-3-pro-image",
 ]
 
 
@@ -129,7 +130,7 @@ async def generate_response(
     client: Optional[genai.Client] = None,
     chat_id: Optional[int] = None,
     user_id: Optional[int] = None,
-) -> str:
+) -> tuple[str, Optional[str]]:
     """Asynchronously generates a text response from the Gemini model.
 
     Args:
@@ -140,10 +141,10 @@ async def generate_response(
         user_id: Optional Telegram user identifier for telemetry attribution.
 
     Returns:
-        The generated response string in Ukrainian, or a friendly error message.
+        A tuple of (response_text, model_name) where model_name is None on error.
     """
     if not prompt or not prompt.strip():
-        return "Будь ласка, вкажіть повідомлення або запитання."
+        return "Будь ласка, вкажіть повідомлення або запитання.", None
 
     # Select model from environment or fallback to default
     model_name = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
@@ -165,7 +166,7 @@ async def generate_response(
             if response and response.text:
                 # Log token usage asynchronously to avoid blocking user response
                 await record_usage(response, model_name, "chat", chat_id, user_id)
-                return response.text.strip()
+                return response.text.strip(), model_name
             logger.warning(f"Model {model_name} returned empty text.")
         except Exception as exc:
             logger.warning(
@@ -175,7 +176,7 @@ async def generate_response(
             continue
 
     logger.error("All Gemini model candidates exhausted.")
-    return API_ERROR_MESSAGE
+    return API_ERROR_MESSAGE, None
 
 
 # System instruction specifically for grounding news briefings in Ukrainian
@@ -191,7 +192,7 @@ async def generate_news_briefing(
     client: Optional[genai.Client] = None,
     chat_id: Optional[int] = None,
     user_id: Optional[int] = None,
-) -> str:
+) -> tuple[str, Optional[str]]:
     """Asynchronously generates a news briefing grounded with Google Search.
 
     Rotates through candidate models if rate limits or unavailable errors occur.
@@ -203,7 +204,7 @@ async def generate_news_briefing(
         user_id: Optional Telegram user identifier for telemetry attribution.
 
     Returns:
-        Structured news briefing in Ukrainian, or a friendly error message.
+        A tuple of (news_text, model_name) where model_name is None on error.
     """
     if topic and topic.strip():
         prompt = (
@@ -235,7 +236,7 @@ async def generate_news_briefing(
                 )
                 if response and response.text:
                     await record_usage(response, model_name, "news", chat_id, user_id)
-                    return response.text.strip()
+                    return response.text.strip(), model_name
                 logger.warning(f"Model {model_name} returned empty text for news briefing.")
             except Exception as exc:
                 exc_str = str(exc)
@@ -260,13 +261,13 @@ async def generate_news_briefing(
             )
             if response and response.text:
                 await record_usage(response, model_name, "news", chat_id, user_id)
-                return response.text.strip()
+                return response.text.strip(), model_name
         except Exception as exc:
             logger.warning(f"Standard news generation with {model_name} failed: {exc}")
             continue
 
     logger.error("All candidate models failed during news briefing.")
-    return API_ERROR_MESSAGE
+    return API_ERROR_MESSAGE, None
 
 
 # System instruction for standup comedy roast persona in Ukrainian
@@ -286,7 +287,7 @@ async def generate_roast(
     client: Optional[genai.Client] = None,
     chat_id: Optional[int] = None,
     user_id: Optional[int] = None,
-) -> str:
+) -> tuple[str, Optional[str]]:
     """Generates a witty standup comedy roast of a user in Ukrainian.
 
     Args:
@@ -297,7 +298,7 @@ async def generate_roast(
         user_id: Optional Telegram user identifier for telemetry attribution.
 
     Returns:
-        A humorous roast in Ukrainian, or a friendly fallback message on failure.
+        A tuple of (roast_text, model_name) where model_name is None on failure.
     """
     clean_target = target_name.lstrip("@").strip()
     if context_messages:
@@ -331,14 +332,14 @@ async def generate_roast(
             )
             if response and response.text:
                 await record_usage(response, model_name, "roast", chat_id, user_id)
-                return response.text.strip()
+                return response.text.strip(), model_name
             logger.warning(f"Model {model_name} returned empty roast text.")
         except Exception as exc:
             logger.warning(f"Roast generation with {model_name} failed: {exc}")
             continue
 
     logger.error("All candidate models failed during roast generation.")
-    return API_ERROR_MESSAGE
+    return API_ERROR_MESSAGE, None
 
 
 IMAGE_ERROR_MESSAGE = (
@@ -352,7 +353,7 @@ async def generate_meme_image(
     client: Optional[genai.Client] = None,
     chat_id: Optional[int] = None,
     user_id: Optional[int] = None,
-) -> tuple[Optional[bytes], Optional[str], Optional[str]]:
+) -> tuple[Optional[bytes], Optional[str], Optional[str], Optional[str]]:
     """Generates an image/meme using Google's Nano Banana multimodal models.
 
     Args:
@@ -362,10 +363,10 @@ async def generate_meme_image(
         user_id: Optional Telegram user identifier for telemetry.
 
     Returns:
-        A tuple of (image_bytes, mime_type, error_message).
+        A tuple of (image_bytes, mime_type, error_message, model_name).
     """
     if not prompt or not prompt.strip():
-        return None, None, "Будь ласка, вкажіть опис для зображення."
+        return None, None, "Будь ласка, вкажіть опис для зображення.", None
 
     full_prompt = (
         f"A funny, high-quality meme illustration: {prompt.strip()}. "
@@ -393,7 +394,7 @@ async def generate_meme_image(
                         if part.inline_data and part.inline_data.data:
                             # Record token consumption in SQLite for /stats
                             await record_usage(response, model_name, "meme", chat_id, user_id)
-                            return part.inline_data.data, part.inline_data.mime_type, None
+                            return part.inline_data.data, part.inline_data.mime_type, None, model_name
 
             logger.warning(f"Image model {model_name} returned no image parts.")
         except Exception as exc:
@@ -403,5 +404,5 @@ async def generate_meme_image(
             continue
 
     logger.error("All Nano Banana image models exhausted.")
-    return None, None, IMAGE_ERROR_MESSAGE
+    return None, None, IMAGE_ERROR_MESSAGE, None
 

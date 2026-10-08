@@ -32,9 +32,10 @@ def test_get_gemini_client_missing_key(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_generate_response_empty_prompt() -> None:
     """Verifies that an empty prompt immediately returns guidance without hitting the API."""
     mock_client = MagicMock()
-    result = asyncio.run(generate_response("   ", client=mock_client))
+    result, model = asyncio.run(generate_response("   ", client=mock_client))
 
     assert "Будь ласка, вкажіть повідомлення" in result
+    assert model is None
     mock_client.aio.models.generate_content.assert_not_called()
 
 
@@ -45,11 +46,12 @@ def test_generate_response_success() -> None:
     mock_response.text = "Привіт! Я готовий допомогти вам."
     mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
-    result = asyncio.run(
+    result, model = asyncio.run(
         generate_response("Привіт, як справи?", client=mock_client)
     )
 
     assert result == "Привіт! Я готовий допомогти вам."
+    assert model == DEFAULT_MODEL
     mock_client.aio.models.generate_content.assert_awaited_once()
 
     # Check arguments passed to generate_content
@@ -67,7 +69,7 @@ def test_generate_response_custom_system_instruction() -> None:
     mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
     custom_instruction = "Спеціальна інструкція."
-    result = asyncio.run(
+    result, model = asyncio.run(
         generate_response(
             "Тестове запитання",
             system_instruction=custom_instruction,
@@ -76,6 +78,7 @@ def test_generate_response_custom_system_instruction() -> None:
     )
 
     assert result == "Спеціальна відповідь."
+    assert model == DEFAULT_MODEL
     call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
     assert call_kwargs["config"].system_instruction == custom_instruction
 
@@ -87,11 +90,12 @@ def test_generate_response_handles_api_exception() -> None:
         side_effect=RuntimeError("Simulated network timeout")
     )
 
-    result = asyncio.run(
+    result, model = asyncio.run(
         generate_response("Будь-який запит", client=mock_client)
     )
 
     assert result == API_ERROR_MESSAGE
+    assert model is None
 
 
 def test_generate_response_handles_empty_api_text() -> None:
@@ -101,10 +105,11 @@ def test_generate_response_handles_empty_api_text() -> None:
     mock_response.text = ""
     mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
-    result = asyncio.run(
+    result, model = asyncio.run(
         generate_response("Будь-який запит", client=mock_client)
     )
     assert result == API_ERROR_MESSAGE
+    assert model is None
 
 
 def test_generate_news_briefing_with_topic() -> None:
@@ -116,9 +121,10 @@ def test_generate_news_briefing_with_topic() -> None:
     mock_response.text = "1. Новини науки сьогодні..."
     mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
-    result = asyncio.run(generate_news_briefing("наука", client=mock_client))
+    result, model = asyncio.run(generate_news_briefing("наука", client=mock_client))
 
     assert result == "1. Новини науки сьогодні..."
+    assert model == DEFAULT_MODEL
     call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
     assert "наука" in call_kwargs["contents"]
     assert call_kwargs["config"].system_instruction == NEWS_SYSTEM_INSTRUCTION
@@ -137,9 +143,10 @@ def test_generate_news_briefing_default_headlines() -> None:
     mock_response.text = "1. Головні світові новини..."
     mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
-    result = asyncio.run(generate_news_briefing(None, client=mock_client))
+    result, model = asyncio.run(generate_news_briefing(None, client=mock_client))
 
     assert result == "1. Головні світові новини..."
+    assert model == DEFAULT_MODEL
     call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
     assert "головних світових" in call_kwargs["contents"]
 
@@ -153,8 +160,9 @@ def test_generate_news_briefing_handles_exception() -> None:
         side_effect=RuntimeError("Google search grounding unavailable")
     )
 
-    result = asyncio.run(generate_news_briefing("технології", client=mock_client))
+    result, model = asyncio.run(generate_news_briefing("технології", client=mock_client))
     assert result == API_ERROR_MESSAGE
+    assert model is None
 
 
 def test_generate_roast_with_context() -> None:
@@ -167,9 +175,10 @@ def test_generate_roast_with_context() -> None:
     mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
     context_msgs = ["я пишу код о 3 ночі", "знову баг у продакшені"]
-    result = asyncio.run(generate_roast("@developer", context_messages=context_msgs, client=mock_client))
+    result, model = asyncio.run(generate_roast("@developer", context_messages=context_msgs, client=mock_client))
 
     assert result == "Смішний роаст про кодування ночами!"
+    assert model == DEFAULT_MODEL
     call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
     assert "@developer" in call_kwargs["contents"]
     assert "я пишу код о 3 ночі" in call_kwargs["contents"]
@@ -184,9 +193,10 @@ def test_generate_roast_without_context() -> None:
     mock_response.text = "Роаст користувача, який мовчить у засідці!"
     mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
-    result = asyncio.run(generate_roast("lurker", context_messages=None, client=mock_client))
+    result, model = asyncio.run(generate_roast("lurker", context_messages=None, client=mock_client))
 
     assert result == "Роаст користувача, який мовчить у засідці!"
+    assert model == DEFAULT_MODEL
     call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
     assert "@lurker" in call_kwargs["contents"]
     assert "засідці" in call_kwargs["contents"]
@@ -201,8 +211,9 @@ def test_generate_roast_handles_failure() -> None:
         side_effect=RuntimeError("Quota limit reached")
     )
 
-    result = asyncio.run(generate_roast("alice", client=mock_client))
+    result, model = asyncio.run(generate_roast("alice", client=mock_client))
     assert result == API_ERROR_MESSAGE
+    assert model is None
 
 
 def test_record_usage_calculates_cost() -> None:
@@ -252,13 +263,14 @@ def test_generate_meme_image_success() -> None:
     mock_response.usage_metadata = None
     mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
-    img_bytes, mime_type, err = asyncio.run(
+    img_bytes, mime_type, err, model = asyncio.run(
         generate_meme_image("кіт на даху", client=mock_client)
     )
 
     assert img_bytes == b"fake-png-bytes"
     assert mime_type == "image/png"
     assert err is None
+    assert model == DEFAULT_IMAGE_MODEL
     mock_client.aio.models.generate_content.assert_awaited_once()
     call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
     assert call_kwargs["model"] == DEFAULT_IMAGE_MODEL
@@ -270,12 +282,13 @@ def test_generate_meme_image_empty_prompt() -> None:
     from core.llm import generate_meme_image
 
     mock_client = MagicMock()
-    img_bytes, mime_type, err = asyncio.run(
+    img_bytes, mime_type, err, model = asyncio.run(
         generate_meme_image("   ", client=mock_client)
     )
 
     assert img_bytes is None
     assert "вкажіть опис" in err
+    assert model is None
     mock_client.aio.models.generate_content.assert_not_called()
 
 

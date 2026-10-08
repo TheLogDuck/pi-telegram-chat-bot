@@ -144,3 +144,14 @@ async def send_formatted_reply(
     except Exception as exc:
         logger.warning(f"Telegram HTML rendering failed ({exc}); falling back to plain text.")
         return await message.reply_text(text, **kwargs)
+
+
+def format_reply_with_model(text: str, model_name: Optional[str]) -> str:
+    """Appends model attribution to the reply text if a model is specified.
+
+    Separates the attribution by two newlines so Telegram renders it as a distinct footer.
+    """
+    if not model_name:
+        return text
+    return f"{text}\n\nМодель: {model_name}"
+

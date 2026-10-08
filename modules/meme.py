@@ -49,19 +49,29 @@ async def meme_command(
     user_id = message.from_user.id if message.from_user else None
 
     # Asynchronously generate the meme image via Nano Banana
-    image_bytes, mime_type, error_msg = await generate_meme_image(
+    result = await generate_meme_image(
         prompt=target_prompt,
         chat_id=chat.id,
         user_id=user_id,
     )
+    if len(result) == 4:
+        image_bytes, mime_type, error_msg, model_used = result
+    else:
+        image_bytes, mime_type, error_msg = result
+        model_used = None
 
     if image_bytes:
         # Stream image from RAM via io.BytesIO without writing to MicroSD storage
         photo_stream = io.BytesIO(image_bytes)
         photo_stream.name = "meme.png"
+        caption = (
+            f"Мем: {target_prompt}\n\nМодель: {model_used}"
+            if model_used
+            else f"Мем: {target_prompt}"
+        )
         await message.reply_photo(
             photo=photo_stream,
-            caption=f"Мем: {target_prompt}",
+            caption=caption,
         )
     else:
         await message.reply_text(error_msg or "Не вдалося створити зображення.")

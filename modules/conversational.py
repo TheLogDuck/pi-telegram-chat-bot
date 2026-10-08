@@ -20,7 +20,12 @@ logger = setup_logger("conversational")
 EMPTY_TAG_PROMPT = "Привіт! Чим я можу вам допомогти?"
 
 
-from core.telegram_utils import clean_bot_mention, is_bot_mentioned, send_formatted_reply
+from core.telegram_utils import (
+    clean_bot_mention,
+    format_reply_with_model,
+    is_bot_mentioned,
+    send_formatted_reply,
+)
 
 
 async def conversational_chat_handler(
@@ -84,10 +89,14 @@ async def conversational_chat_handler(
         logger.warning(f"Failed to send typing chat action: {exc}")
 
     # Generate response via the non-blocking Gemini wrapper
-    ai_response = await generate_response(cleaned_prompt)
+    result = await generate_response(cleaned_prompt)
+    if isinstance(result, tuple):
+        ai_response, model_used = result
+    else:
+        ai_response, model_used = result, None
 
-    # Reply directly to the user's message with rendered HTML (or safe fallback)
-    await send_formatted_reply(message, ai_response)
+    # Reply directly to the user's message with rendered HTML and model attribution
+    await send_formatted_reply(message, format_reply_with_model(ai_response, model_used))
 
 
 def register_conversational(app: Application) -> None:

@@ -7,6 +7,7 @@ from telegram import Message, Update
 from telegram.constants import ChatType, ParseMode
 from core.telegram_utils import (
     clean_bot_mention,
+    format_reply_with_model,
     is_bot_mentioned,
     markdown_to_telegram_html,
     send_formatted_reply,
@@ -101,3 +102,15 @@ def test_send_formatted_reply_fallback_on_error() -> None:
 
     assert mock_message.reply_text.await_count == 2
     mock_message.reply_text.assert_awaited_with("Привіт **світ**!")
+
+
+def test_format_reply_with_model() -> None:
+    """Verifies that format_reply_with_model appends model name when present."""
+    # When model is None or empty, returns original text unchanged
+    assert format_reply_with_model("Привіт", None) == "Привіт"
+    assert format_reply_with_model("Привіт", "") == "Привіт"
+
+    # When model is specified, appends footer
+    expected = "Привіт\n\nМодель: gemini-3.8-flash"
+    assert format_reply_with_model("Привіт", "gemini-3.8-flash") == expected
+
