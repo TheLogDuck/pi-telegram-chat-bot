@@ -66,12 +66,12 @@ async def roast_command(
     except Exception as exc:
         logger.warning(f"Failed to send typing chat action for roast: {exc}")
 
-    # Step 2: Fetch recent messages from SQLite database to ground the roast in context
+    # Step 2: Fetch recent messages from SQLite database to ground the roast in context (expanded to 10)
     context_messages = await async_get_user_messages(
         chat_id=chat.id,
         username=target_name,
         user_id=target_user_id,
-        limit=5,
+        limit=10,
     )
 
     # Step 3: Generate the humorous Ukrainian standup roast

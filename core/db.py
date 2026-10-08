@@ -127,7 +127,7 @@ def get_user_messages(
     chat_id: int,
     username: Optional[str] = None,
     user_id: Optional[int] = None,
-    limit: int = 5,
+    limit: int = 10,
     db_path: Optional[str] = None,
 ) -> list[str]:
     """Retrieves recent non-command messages from a user in a specific chat."""
@@ -185,7 +185,7 @@ async def async_get_user_messages(
     chat_id: int,
     username: Optional[str] = None,
     user_id: Optional[int] = None,
-    limit: int = 5,
+    limit: int = 10,
     db_path: Optional[str] = None,
 ) -> list[str]:
     """Non-blocking async wrapper to retrieve a user's recent messages from SQLite."""

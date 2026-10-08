@@ -65,7 +65,7 @@ def test_roast_command_with_explicit_arg(
         chat_id=12345,
         username="@developer",
         user_id=None,
-        limit=5,
+        limit=10,
     )
     mock_generate.assert_awaited_once_with(
         target_name="@developer",
@@ -102,7 +102,7 @@ def test_roast_command_from_reply_message(
         chat_id=12345,
         username="victim",
         user_id=888,
-        limit=5,
+        limit=10,
     )
     mock_generate.assert_awaited_once_with(
         target_name="victim",

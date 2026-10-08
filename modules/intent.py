@@ -31,8 +31,27 @@ class IntentResult:
 # Canonical keywords for each intent across Ukrainian, Russian, and English
 INTENT_KEYWORDS: Dict[IntentType, List[str]] = {
     IntentType.ROAST: [
-        "roast", "просмаж", "просмажити", "зароасти", "зароасть",
-        "прожарь", "прожарить", "роаст", "прожар", "просмаш", "зарости",
+        # Canonical slash & trigger
+        "roast",
+        # Ukrainian canonical & colloquial slang
+        "просмаж", "просмажити", "просмажка", "просмажте", "підсмаж", "підсмажити",
+        "рознеси", "рознести", "рознос",
+        "постіби", "постібися", "постьоб", "стьоб", "стеб", "вистеби", "висмій", "висміяти",
+        "підколи", "підколоти", "підкол",
+        "затроль", "затролити", "потроль", "потролити", "тролінг",
+        "попусти", "попустити", "розвали", "розвалити", "розмаж", "розмазати",
+        "обісри", "захейти", "захейтити",
+        # Russian canonical & colloquial slang
+        "прожарь", "прожарить", "прожарка", "прожарьте", "поджарь", "поджарить",
+        "роаст", "роасти", "роастить", "зароасти", "зароасть", "роастинг",
+        "разнеси", "разнести", "разнос",
+        "постеби", "постебись", "стеб", "стёб", "высмей", "высмеять",
+        "подколи", "подколоть", "подкол",
+        "затролль", "затроллить", "потролль", "потроллить", "троллинг",
+        "опусти", "опустить", "развали", "развалить", "размажь", "размазать",
+        "обосри", "обосрать",
+        # Common typos & phonetic variants
+        "просмаш", "прожар", "зарости",
     ],
     IntentType.NEWS: [
         "news", "новини", "новина", "новинки", "новости", "новость",
@@ -48,7 +67,24 @@ INTENT_KEYWORDS: Dict[IntentType, List[str]] = {
         "stats", "статистика", "стата", "статы", "statistics",
     ],
     IntentType.MEME: [
-        "meme", "мем", "мемчик", "мемас", "мемасик",
+        # Canonical slash & trigger keyword
+        "meme",
+        # Ukrainian & Russian memes / humor slang
+        "мем", "меми", "мемчик", "мемчики", "мемас", "мемаси", "мемасик", "мемасики",
+        "мемес", "мемєс", "жаба", "жабу", "жабка", "жабку", "фотожаба", "фотожабу",
+        # Visual media & art slang (Ukrainian & Russian)
+        "картинка", "картинку", "картинки", "картиночка", "картиночку",
+        "пікча", "пікчу", "пікчі", "пікчера", "пікчура",
+        "пикча", "пикчу", "пикчи", "пикчер", "пикчера", "пикчура",
+        "зображення", "зображ", "ілюстрація", "ілюстрацію", "иллюстрация", "иллюстрацию",
+        "арт", "арти", "артік", "артик", "артець", "артец",
+        "малюнок", "малюночок", "рисунок", "рисуночек",
+        "фото", "фотка", "фотку", "фоточка", "фоточку",
+        # Drawing & generation action verbs / slang commands
+        "намалюй", "намалювати", "змалюй", "змалювати", "нарисуй", "нарисовать",
+        "згенеруй", "згенери", "згенерувати", "сгенерируй", "сгенери", "сгенерить",
+        "запили", "збацай", "забацай", "замути", "сваргань", "зліпи", "налепи",
+        "наклепай", "накидай", "набросай", "изобрази", "відтвори",
     ],
 }
 
@@ -66,15 +102,19 @@ def extract_target_user(text: str) -> Optional[str]:
     if mention_match:
         return f"@{mention_match.group(1)}"
 
-    # If no explicit @ was found, check if a word follows a roast keyword
+    # If no explicit @ was found, check words following a roast keyword
     tokens = text.split()
     for i, token in enumerate(tokens):
         clean_token = token.lower().strip("!?,.")
-        if clean_token in INTENT_KEYWORDS[IntentType.ROAST] and i + 1 < len(tokens):
-            candidate = tokens[i + 1].strip("!?,.")
-            # Ignore common prepositions
-            if candidate.lower() not in {"на", "про", "about", "for"}:
-                return f"@{candidate.lstrip('@')}"
+        if clean_token in INTENT_KEYWORDS[IntentType.ROAST]:
+            for j in range(i + 1, len(tokens)):
+                candidate = tokens[j].strip("!?,.")
+                # Skip prepositions and courtesy words
+                if candidate.lower() not in {
+                    "на", "про", "над", "about", "for",
+                    "цього", "этого", "цьому", "этому", "будь", "ласка", "пожалуйста", "пліз",
+                }:
+                    return f"@{candidate.lstrip('@')}"
     return None
 
 
@@ -94,15 +134,22 @@ def extract_news_topic(text: str, matched_trigger: str) -> Optional[str]:
 
 
 def extract_meme_prompt(text: str, matched_trigger: str) -> Optional[str]:
-    """Extracts the visual description for a meme by removing trigger words."""
+    """Extracts the visual description for a meme/image by removing trigger words."""
     pattern = rf"\b{re.escape(matched_trigger)}\b"
     remainder = re.sub(pattern, "", text, flags=re.IGNORECASE)
 
-    # Strip punctuation and common request prefixes
+    # Strip punctuation and common request prefixes in Ukrainian and Russian
     cleaned = remainder.strip("!?,. :")
-    filler_pattern = r"^(про|про те як|про те що|про те|about|of|з|со|с|на тему|зроби|намалюй|створи|згенеруй|generate|make|create)\s+"
+    filler_pattern = (
+        r"^(будь ласка|пліз|плиз|пожалуйста|мені|нам|мне|про|про те як|про те що|"
+        r"про то как|про то что|про те|про то|з|зі|со|с|на тему|як|как|"
+        r"зроби|сделай|покажи|намалюй|нарисуй|створи|создай|згенеруй|сгенерируй|"
+        r"запили|забацай|збацай|замути|сваргань|наклепай|набросай|"
+        r"картинку|картинка|пікчу|пікча|пикчу|пикча|арт|зображення|изображение|"
+        r"малюнок|рисунок|фото|фотку|фотожабу|жабу|мем|мемчик|мемас|мемасик)\s+"
+    )
     while re.search(filler_pattern, cleaned, flags=re.IGNORECASE):
-        cleaned = re.sub(filler_pattern, "", cleaned, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(filler_pattern, "", cleaned, flags=re.IGNORECASE).strip("!?,. :")
 
     return cleaned if cleaned else None
 
@@ -195,7 +242,8 @@ def detect_intent(text: str) -> IntentResult:
 
     # 3. Fuzzy matching using Python difflib for typos (e.g. просмаш, зарости)
     for token in tokens:
-        matches = difflib.get_close_matches(token, ALL_KEYWORDS, n=1, cutoff=0.75)
+        # Cutoff 0.80 prevents false positives between Slavic words sharing prefixes (e.g. розкажи vs розмаж)
+        matches = difflib.get_close_matches(token, ALL_KEYWORDS, n=1, cutoff=0.80)
         if matches:
             best_match = matches[0]
             matched_intent = KEYWORD_TO_INTENT[best_match]

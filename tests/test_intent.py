@@ -136,3 +136,71 @@ def test_detect_intent_fallback_to_chat() -> None:
 
     res_empty = detect_intent("   ")
     assert res_empty.intent == IntentType.CHAT
+
+
+def test_detect_intent_image_slang_ukrainian_and_russian() -> None:
+    """Verifies that Ukrainian and Russian slang and drawing verbs trigger MEME intent."""
+    # Ukrainian: намалюй
+    res1 = detect_intent("намалюй кота в капелюсі")
+    assert res1.intent == IntentType.MEME
+    assert res1.topic == "кота в капелюсі"
+
+    # Ukrainian: запили пікчу
+    res2 = detect_intent("запили пікчу про програміста")
+    assert res2.intent == IntentType.MEME
+    assert res2.topic == "програміста"
+
+    # Ukrainian: збацай мемас
+    res3 = detect_intent("збацай мемас як кіт ламає прод")
+    assert res3.intent == IntentType.MEME
+    assert res3.topic == "кіт ламає прод"
+
+    # Russian: нарисуй
+    res4 = detect_intent("нарисуй собаку на скейте")
+    assert res4.intent == IntentType.MEME
+    assert res4.topic == "собаку на скейте"
+
+    # Russian: сделай фотожабу
+    res5 = detect_intent("сделай фотожабу про дедлайн")
+    assert res5.intent == IntentType.MEME
+    assert res5.topic == "дедлайн"
+
+    # Russian: пикча
+    res6 = detect_intent("пикча космического корабля")
+    assert res6.intent == IntentType.MEME
+    assert res6.topic == "космического корабля"
+
+    # Ukrainian: згенеруй картинку
+    res7 = detect_intent("згенеруй картинку захід сонця")
+    assert res7.intent == IntentType.MEME
+    assert res7.topic == "захід сонця"
+
+
+def test_detect_intent_roast_slang_ukrainian_and_russian() -> None:
+    """Verifies colloquial Ukrainian and Russian roast slang and target extraction."""
+    # Ukrainian: рознеси
+    res1 = detect_intent("рознеси @taras")
+    assert res1.intent == IntentType.ROAST
+    assert res1.target_user == "@taras"
+
+    # Ukrainian: постібися над @user (skips preposition 'над')
+    res2 = detect_intent("постібися над @taras")
+    assert res2.intent == IntentType.ROAST
+    assert res2.target_user == "@taras"
+
+    # Ukrainian: підколи олега
+    res3 = detect_intent("підколи олега")
+    assert res3.intent == IntentType.ROAST
+    assert res3.target_user == "@олега"
+
+    # Russian: постебись над @ivan
+    res4 = detect_intent("постебись над @ivan")
+    assert res4.intent == IntentType.ROAST
+    assert res4.target_user == "@ivan"
+
+    # Russian: затролль
+    res5 = detect_intent("затролль @ivan")
+    assert res5.intent == IntentType.ROAST
+    assert res5.target_user == "@ivan"
+
+
