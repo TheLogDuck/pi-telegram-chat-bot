@@ -104,5 +104,54 @@ def test_generate_response_handles_empty_api_text() -> None:
     result = asyncio.run(
         generate_response("Будь-який запит", client=mock_client)
     )
+    assert result == API_ERROR_MESSAGE
 
+
+def test_generate_news_briefing_with_topic() -> None:
+    """Verifies that news briefing includes the topic and Google Search tool."""
+    from core.llm import NEWS_SYSTEM_INSTRUCTION, generate_news_briefing
+
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = "1. Новини науки сьогодні..."
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+    result = asyncio.run(generate_news_briefing("наука", client=mock_client))
+
+    assert result == "1. Новини науки сьогодні..."
+    call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
+    assert "наука" in call_kwargs["contents"]
+    assert call_kwargs["config"].system_instruction == NEWS_SYSTEM_INSTRUCTION
+    # Verify Google Search grounding tool was attached
+    assert call_kwargs["config"].tools is not None
+    assert len(call_kwargs["config"].tools) == 1
+    assert call_kwargs["config"].tools[0].google_search is not None
+
+
+def test_generate_news_briefing_default_headlines() -> None:
+    """Verifies that news briefing without topic requests top headlines."""
+    from core.llm import generate_news_briefing
+
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = "1. Головні світові новини..."
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+    result = asyncio.run(generate_news_briefing(None, client=mock_client))
+
+    assert result == "1. Головні світові новини..."
+    call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
+    assert "головних світових" in call_kwargs["contents"]
+
+
+def test_generate_news_briefing_handles_exception() -> None:
+    """Verifies exception handling in news briefing returns API_ERROR_MESSAGE."""
+    from core.llm import generate_news_briefing
+
+    mock_client = MagicMock()
+    mock_client.aio.models.generate_content = AsyncMock(
+        side_effect=RuntimeError("Google search grounding unavailable")
+    )
+
+    result = asyncio.run(generate_news_briefing("технології", client=mock_client))
     assert result == API_ERROR_MESSAGE

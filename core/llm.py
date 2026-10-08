@@ -90,3 +90,63 @@ async def generate_response(
         # Catch network timeouts, invalid keys, or quota errors without crashing the bot
         logger.error(f"Error communicating with Gemini API: {exc}")
         return API_ERROR_MESSAGE
+
+
+# System instruction specifically for grounding news briefings in Ukrainian
+NEWS_SYSTEM_INSTRUCTION = (
+    "Ти професійний новинний оглядач. "
+    "Створюй перевірені, структуровані та лаконічні дайджести новин виключно українською мовою. "
+    "Форматуй відповідь у вигляді 3-5 головних новин з короткими тезами."
+)
+
+
+async def generate_news_briefing(
+    topic: Optional[str] = None,
+    client: Optional[genai.Client] = None,
+) -> str:
+    """Asynchronously generates a news briefing grounded with Google Search.
+
+    Args:
+        topic: Optional subject filter (e.g. 'технології', 'штучний інтелект').
+        client: Optional injected client for unit testing.
+
+    Returns:
+        Structured news briefing in Ukrainian, or a friendly error message.
+    """
+    model_name = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
+
+    if topic and topic.strip():
+        prompt = (
+            f"Підготуй стислий інформаційний дайджест останніх актуальних новин "
+            f"на тему: {topic.strip()}."
+        )
+    else:
+        prompt = (
+            "Підготуй стислий інформаційний дайджест головних світових "
+            "та технологічних новин на сьогодні."
+        )
+
+    try:
+        llm_client = client or get_gemini_client()
+
+        # Configure Google Search grounding tool to retrieve live real-time news
+        config = types.GenerateContentConfig(
+            system_instruction=NEWS_SYSTEM_INSTRUCTION,
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+        )
+
+        response = await llm_client.aio.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=config,
+        )
+
+        if response and response.text:
+            return response.text.strip()
+
+        logger.warning("Gemini returned empty text for news briefing.")
+        return API_ERROR_MESSAGE
+
+    except Exception as exc:
+        logger.error(f"Error generating grounded news briefing: {exc}")
+        return API_ERROR_MESSAGE
