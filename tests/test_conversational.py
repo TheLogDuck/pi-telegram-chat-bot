@@ -127,6 +127,34 @@ def test_conversational_handler_tagged_generates_ai_response(mock_generate: Asyn
     update.effective_message.reply_text.assert_awaited_once_with("Це чудове запитання про науку.")
 
 
+def test_conversational_handler_dispatches_ping_intent() -> None:
+    """Verifies that tagging the bot with 'пінг' or 'пинг' routes to ping_command."""
+    from modules.commands import PING_TEXT
+
+    update = make_chat_update(ChatType.GROUP, "@my_bot пінг")
+    context = MagicMock()
+    context.bot.username = "my_bot"
+    context.bot.id = 999
+
+    asyncio.run(conversational_chat_handler(update, context))
+
+    update.effective_message.reply_text.assert_awaited_once_with(PING_TEXT)
+
+
+def test_conversational_handler_dispatches_help_intent() -> None:
+    """Verifies that tagging the bot with 'допомога' routes to help_command."""
+    from modules.commands import HELP_TEXT
+
+    update = make_chat_update(ChatType.GROUP, "@my_bot допомога")
+    context = MagicMock()
+    context.bot.username = "my_bot"
+    context.bot.id = 999
+
+    asyncio.run(conversational_chat_handler(update, context))
+
+    update.effective_message.reply_text.assert_awaited_once_with(HELP_TEXT)
+
+
 def test_register_conversational() -> None:
     """Verifies that register_conversational adds a message handler in group 0."""
     mock_app = MagicMock(spec=Application)

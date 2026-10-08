@@ -7,6 +7,9 @@ from telegram.constants import ChatAction, ChatType
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 from core.llm import generate_response
 from core.logger import setup_logger
+from modules.analytics import stats_command
+from modules.commands import help_command, ping_command
+from modules.intent import IntentType, detect_intent
 
 logger = setup_logger("conversational")
 
@@ -92,6 +95,20 @@ async def conversational_chat_handler(
     # If the user only tagged the bot without asking anything, greet them
     if not cleaned_prompt:
         await message.reply_text(EMPTY_TAG_PROMPT)
+        return
+
+    # Check for natural language or slash command intents
+    intent_result = detect_intent(cleaned_prompt)
+
+    # Route matched commands to their specialized handlers
+    if intent_result.intent == IntentType.PING:
+        await ping_command(update, context)
+        return
+    elif intent_result.intent == IntentType.HELP:
+        await help_command(update, context)
+        return
+    elif intent_result.intent == IntentType.STATS:
+        await stats_command(update, context)
         return
 
     # Inform the user that Gemini is processing their response
