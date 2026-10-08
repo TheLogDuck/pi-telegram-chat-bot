@@ -14,6 +14,7 @@ class IntentType(Enum):
     PING = auto()
     HELP = auto()
     STATS = auto()
+    MEME = auto()
     CHAT = auto()  # General conversational fallback for Gemini AI
 
 
@@ -45,6 +46,9 @@ INTENT_KEYWORDS: Dict[IntentType, List[str]] = {
     ],
     IntentType.STATS: [
         "stats", "статистика", "стата", "статы", "statistics",
+    ],
+    IntentType.MEME: [
+        "meme", "мем", "мемчик", "мемас", "мемасик",
     ],
 }
 
@@ -87,6 +91,21 @@ def extract_news_topic(text: str, matched_trigger: str) -> Optional[str]:
         cleaned = re.sub(filler_pattern, "", cleaned, flags=re.IGNORECASE).strip()
 
     return cleaned if cleaned else None
+
+
+def extract_meme_prompt(text: str, matched_trigger: str) -> Optional[str]:
+    """Extracts the visual description for a meme by removing trigger words."""
+    pattern = rf"\b{re.escape(matched_trigger)}\b"
+    remainder = re.sub(pattern, "", text, flags=re.IGNORECASE)
+
+    # Strip punctuation and common request prefixes
+    cleaned = remainder.strip("!?,. :")
+    filler_pattern = r"^(про|про те як|про те що|про те|about|of|з|со|с|на тему|зроби|намалюй|створи|згенеруй|generate|make|create)\s+"
+    while re.search(filler_pattern, cleaned, flags=re.IGNORECASE):
+        cleaned = re.sub(filler_pattern, "", cleaned, flags=re.IGNORECASE).strip()
+
+    return cleaned if cleaned else None
+
 
 
 def detect_intent(text: str) -> IntentResult:
@@ -132,6 +151,15 @@ def detect_intent(text: str) -> IntentResult:
             return IntentResult(intent=IntentType.HELP, confidence=1.0, raw_query=query)
         elif base_cmd == "stats":
             return IntentResult(intent=IntentType.STATS, confidence=1.0, raw_query=query)
+        elif base_cmd == "meme":
+            tokens = query.split(maxsplit=1)
+            prompt = tokens[1].strip() if len(tokens) > 1 else None
+            return IntentResult(
+                intent=IntentType.MEME,
+                confidence=1.0,
+                topic=prompt,
+                raw_query=query,
+            )
 
     # 2. Tokenize query into clean words for natural language matching
     tokens = [re.sub(r"[^\wа-яА-ЯіїєґІЇЄҐёЁ]", "", tok.lower()) for tok in query.split()]
@@ -153,6 +181,13 @@ def detect_intent(text: str) -> IntentResult:
                     intent=IntentType.NEWS,
                     confidence=1.0,
                     topic=extract_news_topic(query, token),
+                    raw_query=query,
+                )
+            elif matched_intent == IntentType.MEME:
+                return IntentResult(
+                    intent=IntentType.MEME,
+                    confidence=1.0,
+                    topic=extract_meme_prompt(query, token),
                     raw_query=query,
                 )
             else:
@@ -177,6 +212,13 @@ def detect_intent(text: str) -> IntentResult:
                     intent=IntentType.NEWS,
                     confidence=0.85,
                     topic=extract_news_topic(query, token),
+                    raw_query=query,
+                )
+            elif matched_intent == IntentType.MEME:
+                return IntentResult(
+                    intent=IntentType.MEME,
+                    confidence=0.85,
+                    topic=extract_meme_prompt(query, best_match),
                     raw_query=query,
                 )
             else:

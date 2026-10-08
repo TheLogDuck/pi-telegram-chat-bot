@@ -187,6 +187,20 @@ def test_conversational_handler_dispatches_roast_intent(mock_roast: AsyncMock) -
     mock_roast.assert_awaited_once_with(update, context, target_user="@alex")
 
 
+@patch("modules.conversational.meme_command", new_callable=AsyncMock)
+def test_conversational_handler_dispatches_meme_intent(mock_meme: AsyncMock) -> None:
+    """Verifies that tagging the bot with 'мем про програмування' routes to meme_command."""
+    update = make_chat_update(ChatType.GROUP, "@my_bot мем про програмування")
+    context = MagicMock()
+    context.bot.username = "my_bot"
+    context.bot.id = 999
+
+    asyncio.run(conversational_chat_handler(update, context))
+
+    mock_meme.assert_awaited_once_with(update, context, prompt="програмування")
+
+
+
 def test_register_conversational() -> None:
     """Verifies that register_conversational adds a message handler in group 0."""
     mock_app = MagicMock(spec=Application)

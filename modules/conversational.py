@@ -12,6 +12,7 @@ from modules.commands import help_command, ping_command
 from modules.intent import IntentType, detect_intent
 from modules.news import news_command
 from modules.roast import roast_command
+from modules.meme import meme_command
 
 logger = setup_logger("conversational")
 
@@ -67,6 +68,9 @@ async def conversational_chat_handler(
         return
     elif intent_result.intent == IntentType.ROAST:
         await roast_command(update, context, target_user=intent_result.target_user)
+        return
+    elif intent_result.intent == IntentType.MEME:
+        await meme_command(update, context, prompt=intent_result.topic)
         return
 
     # Inform the user that Gemini is processing their response

@@ -29,6 +29,10 @@ def test_detect_intent_slash_commands() -> None:
     res_stats = detect_intent("/stats")
     assert res_stats.intent == IntentType.STATS
 
+    res_meme = detect_intent("/meme funny duck")
+    assert res_meme.intent == IntentType.MEME
+    assert res_meme.topic == "funny duck"
+
 
 def test_detect_intent_ukrainian_triggers() -> None:
     """Verifies Ukrainian natural language commands and argument extraction."""
@@ -43,6 +47,10 @@ def test_detect_intent_ukrainian_triggers() -> None:
     res_news = detect_intent("останні новини про космос")
     assert res_news.intent == IntentType.NEWS
     assert res_news.topic == "космос"
+
+    res_meme = detect_intent("мем про кота програміста")
+    assert res_meme.intent == IntentType.MEME
+    assert res_meme.topic == "кота програміста"
 
     res_ping = detect_intent("пінг")
     assert res_ping.intent == IntentType.PING

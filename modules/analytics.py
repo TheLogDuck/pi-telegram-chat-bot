@@ -5,12 +5,18 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 from core.db import async_get_token_usage_stats
-from core.llm import DEFAULT_MODEL
 from core.logger import setup_logger
 
 logger = setup_logger("analytics")
 
 NON_OWNER_MESSAGE = "Ця команда доступна виключно адміністратору бота."
+
+FEATURE_LABELS = {
+    "chat": "Діалоги (Chat)",
+    "news": "Новини (News)",
+    "roast": "Прожарки (Roast)",
+    "meme": "Меми / Зображення (Nano Banana)",
+}
 
 
 def is_owner(update: Update) -> bool:
@@ -24,7 +30,7 @@ def is_owner(update: Update) -> bool:
     return str(update.effective_user.id) == str(admin_id).strip()
 
 
-def format_stats_report(stats: dict, active_model: str) -> str:
+def format_stats_report(stats: dict) -> str:
     """Renders usage data into a clean, readable text report in Ukrainian."""
     today = stats.get("today", {})
     total = stats.get("total", {})
@@ -32,7 +38,6 @@ def format_stats_report(stats: dict, active_model: str) -> str:
 
     lines = [
         "<b>Статистика використання Gemini API (Tier 1)</b>\n",
-        f"<b>Поточна модель:</b> <code>{active_model}</code>",
         "<b>Тариф:</b> Pay-as-you-go (Tier 1)\n",
         "<b>Сьогодні (UTC):</b>",
         f"  - Запитів: {today.get('calls', 0)}",
@@ -47,14 +52,15 @@ def format_stats_report(stats: dict, active_model: str) -> str:
     if by_feature:
         lines.append("<b>Використання за функціями:</b>")
         for feat, data in by_feature.items():
+            label = FEATURE_LABELS.get(feat, feat)
             lines.append(
-                f"  - {feat}: {data.get('calls', 0)} запитів | "
+                f"  - {label}: {data.get('calls', 0)} запитів | "
                 f"{data.get('tokens', 0):,} токенів (${data.get('cost_usd', 0.0):.4f})"
             )
         lines.append("")
 
     lines.append(
-        "<i>Ліміти Tier 1: ~1,000 RPM | 4,000,000 TPM | Без денного ліміту.</i>"
+        "<i>Ліміти Tier 1: ~1,000 RPM (текст) | ~500 RPM / 2,000 RPD (Nano Banana).</i>"
     )
     return "\n".join(lines)
 
@@ -71,9 +77,8 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     # Retrieve aggregated token and dollar metrics from local SQLite
     stats = await async_get_token_usage_stats()
-    active_model = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
 
-    report_text = format_stats_report(stats, active_model)
+    report_text = format_stats_report(stats)
     await update.effective_message.reply_text(
         report_text,
         parse_mode=ParseMode.HTML,

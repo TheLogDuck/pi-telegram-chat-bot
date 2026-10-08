@@ -18,6 +18,24 @@ MODEL_ROTATION_CANDIDATES = [
     "gemini-flash-lite-latest",
 ]
 
+# Image generation models ("Nano Banana" series from Google DeepMind)
+DEFAULT_IMAGE_MODEL = "gemini-2.5-flash-image"
+IMAGE_MODEL_ROTATION_CANDIDATES = [
+    "gemini-2.5-flash-image",       # Nano Banana (500 RPM, 2K RPD)
+    "gemini-3.1-flash-image",       # Nano Banana 2 (100 RPM, 1K RPD)
+    "gemini-3.1-flash-lite-image",  # Nano Banana 2 Lite (150 RPM, 1K RPD)
+    "gemini-3-pro-image",           # Nano Banana Pro (20 RPM, 250 RPD)
+]
+
+
+def get_candidate_image_models() -> list[str]:
+    """Returns ordered list of Nano Banana image models for failover rotation."""
+    configured = os.getenv("GEMINI_IMAGE_MODEL")
+    if configured:
+        return [configured] + [m for m in IMAGE_MODEL_ROTATION_CANDIDATES if m != configured]
+    return list(IMAGE_MODEL_ROTATION_CANDIDATES)
+
+
 # Track whether Google Search tool quota is available on this API key.
 # On Free Tier accounts, this disables cleanly on the first 429 to avoid retry storms.
 _search_grounding_available = os.getenv("ENABLE_SEARCH_GROUNDING", "true").lower() in ("true", "1", "yes")
@@ -321,3 +339,69 @@ async def generate_roast(
 
     logger.error("All candidate models failed during roast generation.")
     return API_ERROR_MESSAGE
+
+
+IMAGE_ERROR_MESSAGE = (
+    "Вибачте, не вдалося згенерувати зображення через штучний інтелект. "
+    "Будь ласка, спробуйте ще раз пізніше або змініть опис."
+)
+
+
+async def generate_meme_image(
+    prompt: str,
+    client: Optional[genai.Client] = None,
+    chat_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+) -> tuple[Optional[bytes], Optional[str], Optional[str]]:
+    """Generates an image/meme using Google's Nano Banana multimodal models.
+
+    Args:
+        prompt: User's visual prompt or concept description.
+        client: Optional injected Gemini client for testing.
+        chat_id: Optional Telegram chat identifier for telemetry.
+        user_id: Optional Telegram user identifier for telemetry.
+
+    Returns:
+        A tuple of (image_bytes, mime_type, error_message).
+    """
+    if not prompt or not prompt.strip():
+        return None, None, "Будь ласка, вкажіть опис для зображення."
+
+    full_prompt = (
+        f"A funny, high-quality meme illustration: {prompt.strip()}. "
+        "Clear composition, witty visual humor."
+    )
+
+    llm_client = client or get_gemini_client()
+    config = types.GenerateContentConfig(
+        response_modalities=["IMAGE"],
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+    )
+
+    for model_name in get_candidate_image_models():
+        try:
+            response = await llm_client.aio.models.generate_content(
+                model=model_name,
+                contents=full_prompt,
+                config=config,
+            )
+            # Find the binary image part in response candidates
+            if response and response.candidates:
+                candidate = response.candidates[0]
+                if candidate.content and candidate.content.parts:
+                    for part in candidate.content.parts:
+                        if part.inline_data and part.inline_data.data:
+                            # Record token consumption in SQLite for /stats
+                            await record_usage(response, model_name, "meme", chat_id, user_id)
+                            return part.inline_data.data, part.inline_data.mime_type, None
+
+            logger.warning(f"Image model {model_name} returned no image parts.")
+        except Exception as exc:
+            logger.warning(
+                f"Image generation with {model_name} failed: {exc}. Trying next candidate..."
+            )
+            continue
+
+    logger.error("All Nano Banana image models exhausted.")
+    return None, None, IMAGE_ERROR_MESSAGE
+

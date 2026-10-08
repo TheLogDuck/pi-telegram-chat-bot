@@ -53,12 +53,11 @@ def test_format_stats_report() -> None:
         },
     }
 
-    report = format_stats_report(mock_stats, active_model="gemini-3.8-flash")
+    report = format_stats_report(mock_stats)
 
-    assert "gemini-3.8-flash" in report
     assert "Сьогодні (UTC):" in report
     assert "2,000" in report
     assert "$0.0004" in report
-    assert "chat: 10 запитів" in report
-    assert "news: 5 запитів" in report
+    assert "Діалоги (Chat): 10 запитів" in report
+    assert "Новини (News): 5 запитів" in report
     assert "Ліміти Tier 1" in report

@@ -236,3 +236,46 @@ def test_record_usage_calculates_cost() -> None:
         # 1000 * 0.10/1M + 500 * 0.40/1M = 0.0001 + 0.0002 = 0.0003
         assert abs(call_kwargs["cost_usd"] - 0.0003) < 1e-6
 
+
+def test_generate_meme_image_success() -> None:
+    """Verifies that generate_meme_image extracts image bytes and records usage."""
+    from core.llm import DEFAULT_IMAGE_MODEL, generate_meme_image
+
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_candidate = MagicMock()
+    mock_part = MagicMock()
+    mock_part.inline_data.data = b"fake-png-bytes"
+    mock_part.inline_data.mime_type = "image/png"
+    mock_candidate.content.parts = [mock_part]
+    mock_response.candidates = [mock_candidate]
+    mock_response.usage_metadata = None
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+    img_bytes, mime_type, err = asyncio.run(
+        generate_meme_image("кіт на даху", client=mock_client)
+    )
+
+    assert img_bytes == b"fake-png-bytes"
+    assert mime_type == "image/png"
+    assert err is None
+    mock_client.aio.models.generate_content.assert_awaited_once()
+    call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
+    assert call_kwargs["model"] == DEFAULT_IMAGE_MODEL
+    assert "кіт на даху" in call_kwargs["contents"]
+
+
+def test_generate_meme_image_empty_prompt() -> None:
+    """Verifies that empty prompt returns guidance without hitting API."""
+    from core.llm import generate_meme_image
+
+    mock_client = MagicMock()
+    img_bytes, mime_type, err = asyncio.run(
+        generate_meme_image("   ", client=mock_client)
+    )
+
+    assert img_bytes is None
+    assert "вкажіть опис" in err
+    mock_client.aio.models.generate_content.assert_not_called()
+
+

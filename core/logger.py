@@ -55,6 +55,7 @@ def setup_logger(name: str = "bot") -> logging.Logger:
         logging.getLogger("httpx").setLevel(logging.WARNING)
         logging.getLogger("httpcore").setLevel(logging.WARNING)
         logging.getLogger("telegram.ext").setLevel(logging.WARNING)
+        logging.getLogger("google_genai").setLevel(logging.WARNING)
 
         _LOGGING_INITIALIZED = True
 
