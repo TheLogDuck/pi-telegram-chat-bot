@@ -52,6 +52,8 @@ async def persona_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             target_key = "cynic"
         elif requested in ("standard", "default", "стандартний", "дефолт"):
             target_key = "standard"
+        elif requested in ("meme_lord", "memelord", "meme", "мемлорд", "мем_лорд", "мем"):
+            target_key = "meme_lord"
 
         if target_key:
             await async_set_user_persona(user.id, target_key)

@@ -33,6 +33,7 @@ def test_get_persona_fallbacks() -> None:
     """Verifies that get_persona resolves valid keys and safely falls back to standard."""
     assert get_persona("standard").key == "standard"
     assert get_persona("cynic").key == "cynic"
+    assert get_persona("meme_lord").key == "meme_lord"
     assert get_persona(None).key == "standard"
     assert get_persona("nonexistent_alien_persona").key == "standard"
 
@@ -61,7 +62,7 @@ def test_build_persona_keyboard() -> None:
     """Verifies keyboard buttons format and marks active persona."""
     markup = build_persona_keyboard("standard")
     buttons = [row[0] for row in markup.inline_keyboard]
-    assert len(buttons) == 2
+    assert len(buttons) == 3
 
     # Standard should be marked as active
     assert "[Обрано]" in buttons[0].text
@@ -70,6 +71,10 @@ def test_build_persona_keyboard() -> None:
     # Cynic should not be marked active
     assert "[Обрано]" not in buttons[1].text
     assert buttons[1].callback_data == f"{CALLBACK_PREFIX}cynic"
+
+    # Meme Lord should not be marked active
+    assert "[Обрано]" not in buttons[2].text
+    assert buttons[2].callback_data == f"{CALLBACK_PREFIX}meme_lord"
 
 
 def test_persona_command_no_args_displays_keyboard(tmp_path) -> None:
@@ -215,3 +220,71 @@ def test_persona_intent_detection() -> None:
 
     res2 = detect_intent("персона")
     assert res2.intent == IntentType.PERSONA
+
+
+def test_persona_command_with_meme_lord_shortcut() -> None:
+    """Verifies /persona meme_lord sets the persona directly."""
+    update = MagicMock(spec=Update)
+    message = MagicMock()
+    message.reply_text = AsyncMock()
+    update.effective_message = message
+    update.effective_user.id = 5003
+
+    context = MagicMock()
+    context.args = ["meme_lord"]
+
+    with patch("modules.persona.async_set_user_persona", new_callable=AsyncMock) as mock_set:
+        asyncio.run(persona_command(update, context))
+
+        mock_set.assert_awaited_once_with(5003, "meme_lord")
+        message.reply_text.assert_awaited_once()
+        text = message.reply_text.await_args.args[0]
+        assert "Стиль успішно змінено:" in text
+        assert "Мем-лорд" in text
+
+
+def test_llm_generate_roast_with_meme_lord_persona() -> None:
+    """Verifies that generate_roast applies meme-lord shitpost/irony prompt."""
+    from core.personas import MEME_LORD_PERSONA
+
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = "Базова просмажка від мем-лорда."
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+    result, model = asyncio.run(
+        generate_roast(
+            target_name="victim_user",
+            context_messages=["я роблю дизайн у ворді"],
+            persona_key="meme_lord",
+            client=mock_client,
+        )
+    )
+
+    assert result == "Базова просмажка від мем-лорда."
+    call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
+    config = call_kwargs["config"]
+    assert config.system_instruction == MEME_LORD_PERSONA.roast_system_instruction
+    assert "постіронічну просмажку" in call_kwargs["contents"]
+
+
+def test_llm_generate_meme_with_meme_lord_persona() -> None:
+    """Verifies that generate_meme_image applies viral meme prompt template."""
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_candidate = MagicMock()
+    mock_part = MagicMock()
+    mock_part.inline_data.data = b"viral_meme_bytes"
+    mock_part.inline_data.mime_type = "image/png"
+    mock_candidate.content.parts = [mock_part]
+    mock_response.candidates = [mock_candidate]
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+    data, mime, err, model = asyncio.run(
+        generate_meme_image("кіт дивиться в монітор", persona_key="meme_lord", client=mock_client)
+    )
+
+    assert data == b"viral_meme_bytes"
+    call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
+    assert "viral modern meme concept" in call_kwargs["contents"]
+
