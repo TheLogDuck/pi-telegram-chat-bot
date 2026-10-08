@@ -136,3 +136,40 @@ def test_register_roast() -> None:
     mock_app = MagicMock(spec=Application)
     register_roast(mock_app)
     mock_app.add_handler.assert_called_once()
+
+
+@patch("modules.roast.async_get_user_messages", new_callable=AsyncMock)
+@patch("modules.roast.generate_roast", new_callable=AsyncMock)
+def test_roast_command_reply_to_bot_injects_message_text(
+    mock_generate: AsyncMock,
+    mock_db: AsyncMock,
+) -> None:
+    """Verifies that replying to another bot's message injects its text into roast context."""
+    # SQLite has zero history for this bot because Telegram drops bot messages from listener
+    mock_db.return_value = []
+    mock_generate.return_value = ("**Роаст @OtherBot:** Смішний жарт!", "gemini-3.8-flash")
+
+    bot_target = MagicMock(spec=User)
+    bot_target.id = 99999
+    bot_target.username = "OtherBot"
+    bot_target.is_bot = True
+
+    update = make_roast_update("/roast", reply_user=bot_target)
+    # The message being replied to has specific text
+    update.effective_message.reply_to_message.text = "I am OtherBot and I love binary."
+
+    context = MagicMock()
+    context.bot.send_chat_action = AsyncMock()
+    context.args = []
+
+    asyncio.run(roast_command(update, context))
+
+    # Replied text is injected into context_messages
+    mock_generate.assert_awaited_once_with(
+        target_name="OtherBot",
+        context_messages=["I am OtherBot and I love binary."],
+    )
+    update.effective_message.reply_text.assert_awaited_once_with(
+        "<b>Роаст @OtherBot:</b> Смішний жарт!\n\nМодель: gemini-3.8-flash",
+        parse_mode=ParseMode.HTML,
+    )
