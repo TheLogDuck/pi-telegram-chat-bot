@@ -303,3 +303,38 @@ def test_access_list_command(monkeypatch, tmp_path):
     update.effective_message.reply_text.assert_awaited_once()
     msg = update.effective_message.reply_text.call_args[0][0]
     assert "888" in msg
+
+
+def test_admin_in_unapproved_group_is_blocked_with_guidance(monkeypatch, tmp_path):
+    """Verifies that admin in unapproved group is blocked on regular commands (Option A)."""
+    test_db = str(tmp_path / "test.db")
+    init_db(test_db)
+    monkeypatch.setenv("DATABASE_PATH", test_db)
+    monkeypatch.setenv("ADMIN_CHAT_ID", "9999")
+
+    update = make_update(ChatType.GROUP, "/ping", user_id=9999, chat_id=-1099)
+    context = make_context()
+
+    with pytest.raises(ApplicationHandlerStop):
+        asyncio.run(auth_gatekeeper(update, context))
+
+    # Bot sends guidance to the admin in the group
+    update.effective_message.reply_text.assert_awaited_once()
+    notice = update.effective_message.reply_text.call_args[0][0]
+    assert "Ви є адміністратором бота" in notice
+    assert "/approve" in notice
+
+
+def test_admin_management_command_passes_in_unapproved_group(monkeypatch, tmp_path):
+    """Verifies that admin can run /approve in an unapproved group to whitelist it."""
+    test_db = str(tmp_path / "test.db")
+    init_db(test_db)
+    monkeypatch.setenv("DATABASE_PATH", test_db)
+    monkeypatch.setenv("ADMIN_CHAT_ID", "9999")
+
+    update = make_update(ChatType.GROUP, "/approve", user_id=9999, chat_id=-1099)
+    context = make_context()
+
+    # Passes through cleanly without raising ApplicationHandlerStop
+    asyncio.run(auth_gatekeeper(update, context))
+    update.effective_message.reply_text.assert_not_called()

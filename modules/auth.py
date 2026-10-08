@@ -104,10 +104,6 @@ async def auth_gatekeeper(
     if not message or not chat or not user:
         return
 
-    # Owner / Admin always has full access
-    if is_admin(user.id):
-        return
-
     bot_username = context.bot.username if context.bot else None
     bot_id = context.bot.id if context.bot else None
 
@@ -115,15 +111,23 @@ async def auth_gatekeeper(
     if not is_message_targeting_bot(update, bot_username, bot_id):
         return
 
-    # Hybrid scope: check user for private DMs, check group chat for groups
+    # Option A: Strict scope separation
     if chat.type == ChatType.PRIVATE:
+        # In private 1-on-1 chats, bot owner/admin always has full access
+        if is_admin(user.id):
+            return
         entity_type = "user"
         entity_id = user.id
         entity_title = user.username or user.first_name
     else:
+        # In group chats, the group itself must be explicitly authorized
         entity_type = "chat"
         entity_id = chat.id
         entity_title = chat.title or f"Group {chat.id}"
+
+        # Allow admin management commands (/approve, /reject, /access) to pass through
+        if is_admin(user.id) and message.text and message.text.strip().startswith(("/approve", "/reject", "/access")):
+            return
 
     # Verify authorization status
     if await is_authorized(entity_type, entity_id):
@@ -186,6 +190,11 @@ async def auth_gatekeeper(
                 "<b>Цей бот є приватним.</b> Доступ надається лише після підтвердження адміністратором.\n"
                 "Запит на доступ успішно надіслано адміністратору."
             )
+        elif is_admin(user.id):
+            notice = (
+                "<b>Цей бот є приватним.</b> Доступ для цієї групи ще не активовано.\n"
+                "Ви є адміністратором бота: надішліть <code>/approve</code>, щоб активувати доступ для цієї групи."
+            )
         else:
             notice = (
                 "<b>Цей бот є приватним.</b> Доступ для цієї групи ще не активовано.\n"
@@ -194,8 +203,15 @@ async def auth_gatekeeper(
         await message.reply_text(notice, parse_mode=ParseMode.HTML)
 
     elif status == "pending":
+        if entity_type == "chat" and is_admin(user.id):
+            pending_msg = (
+                "<b>Запит на розгляді:</b> Доступ для цієї групи очікує на активацію.\n"
+                "Надішліть <code>/approve</code>, щоб схвалити доступ для цієї групи."
+            )
+        else:
+            pending_msg = "<b>Запит на розгляді:</b> Ваш запит на доступ очікує на підтвердження адміністратором."
         await message.reply_text(
-            "<b>Запит на розгляді:</b> Ваш запит на доступ очікує на підтвердження адміністратором.",
+            pending_msg,
             parse_mode=ParseMode.HTML,
         )
     elif status == "rejected":
