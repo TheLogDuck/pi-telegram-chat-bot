@@ -126,7 +126,8 @@ def test_conversational_handler_tagged_generates_ai_response(mock_generate: Asyn
         chat_id=update.effective_chat.id,
         action=ChatAction.TYPING,
     )
-    mock_generate.assert_awaited_once_with("розкажи про зорі")
+    assert mock_generate.await_args.args[0] == "розкажи про зорі"
+    assert mock_generate.await_args.kwargs.get("persona_key") == "standard"
     update.effective_message.reply_text.assert_awaited_once_with(
         "Це чудове запитання про науку.\n\nМодель: gemini-3.8-flash",
         parse_mode=ParseMode.HTML,

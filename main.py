@@ -15,6 +15,7 @@ from modules.news import register_news
 from modules.roast import register_roast
 from modules.meme import register_meme
 from modules.auth import register_auth
+from modules.persona import register_persona
 
 
 logger = setup_logger("main")
@@ -99,6 +100,7 @@ def main() -> None:
 
     # Register standard bot commands (group 0)
     register_commands(app)
+    register_persona(app)
     register_analytics(app)
     register_news(app)
     register_roast(app)

@@ -62,6 +62,7 @@ def test_meme_command_success_with_args(mock_generate: AsyncMock) -> None:
         prompt="funny cat on pi",
         chat_id=12345,
         user_id=777,
+        persona_key="standard",
     )
     update.effective_message.reply_photo.assert_awaited_once()
     call_kwargs = update.effective_message.reply_photo.await_args.kwargs
@@ -87,6 +88,7 @@ def test_meme_command_injected_prompt(mock_generate: AsyncMock) -> None:
         prompt="програмування",
         chat_id=12345,
         user_id=777,
+        persona_key="standard",
     )
     update.effective_message.reply_photo.assert_awaited_once()
     call_kwargs = update.effective_message.reply_photo.await_args.kwargs

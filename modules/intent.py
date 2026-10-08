@@ -15,6 +15,7 @@ class IntentType(Enum):
     HELP = auto()
     STATS = auto()
     MEME = auto()
+    PERSONA = auto()
     CHAT = auto()  # General conversational fallback for Gemini AI
 
 
@@ -85,6 +86,9 @@ INTENT_KEYWORDS: Dict[IntentType, List[str]] = {
         "згенеруй", "згенери", "згенерувати", "сгенерируй", "сгенери", "сгенерить",
         "запили", "збацай", "забацай", "замути", "сваргань", "зліпи", "налепи",
         "наклепай", "накидай", "набросай", "изобрази", "відтвори",
+    ],
+    IntentType.PERSONA: [
+        "persona", "персона", "персони", "персону", "персонаж",
     ],
 }
 

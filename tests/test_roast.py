@@ -70,6 +70,9 @@ def test_roast_command_with_explicit_arg(
     mock_generate.assert_awaited_once_with(
         target_name="@developer",
         context_messages=["люблю каву", "знову дедлайн"],
+        chat_id=12345,
+        user_id=777,
+        persona_key="standard",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
         "<b>Роаст @developer:</b> Забагато кави!\n\nМодель: gemini-3.8-flash",
@@ -107,6 +110,9 @@ def test_roast_command_from_reply_message(
     mock_generate.assert_awaited_once_with(
         target_name="victim",
         context_messages=[],
+        chat_id=12345,
+        user_id=777,
+        persona_key="standard",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
         "<b>Роаст @victim:</b> Привіт жертві!\n\nМодель: gemini-3.8-flash",
@@ -168,6 +174,9 @@ def test_roast_command_reply_to_bot_injects_message_text(
     mock_generate.assert_awaited_once_with(
         target_name="OtherBot",
         context_messages=["I am OtherBot and I love binary."],
+        chat_id=12345,
+        user_id=777,
+        persona_key="standard",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
         "<b>Роаст @OtherBot:</b> Смішний жарт!\n\nМодель: gemini-3.8-flash",

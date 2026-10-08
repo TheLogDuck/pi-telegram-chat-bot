@@ -5,8 +5,29 @@ from typing import Optional
 from google import genai
 from google.genai import types
 from core.logger import setup_logger
+from core.personas import get_persona
 
 logger = setup_logger("llm")
+
+# Permissive safety settings for 18+ cynical/dark humor persona to prevent API false-positive blocks
+CYNIC_SAFETY_SETTINGS = [
+    types.SafetySetting(
+        category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+        threshold=types.HarmBlockThreshold.BLOCK_NONE,
+    ),
+    types.SafetySetting(
+        category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+        threshold=types.HarmBlockThreshold.BLOCK_NONE,
+    ),
+    types.SafetySetting(
+        category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        threshold=types.HarmBlockThreshold.BLOCK_NONE,
+    ),
+    types.SafetySetting(
+        category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+        threshold=types.HarmBlockThreshold.BLOCK_NONE,
+    ),
+]
 
 # Default primary model and ordered rotation candidates for free-tier resilience
 DEFAULT_MODEL = "gemini-3.8-flash"
@@ -130,6 +151,7 @@ async def generate_response(
     client: Optional[genai.Client] = None,
     chat_id: Optional[int] = None,
     user_id: Optional[int] = None,
+    persona_key: Optional[str] = None,
 ) -> tuple[str, Optional[str]]:
     """Asynchronously generates a text response from the Gemini model.
 
@@ -139,6 +161,7 @@ async def generate_response(
         client: Optional injected client (useful for unit testing and mocking).
         chat_id: Optional Telegram chat identifier for telemetry attribution.
         user_id: Optional Telegram user identifier for telemetry attribution.
+        persona_key: Optional persona identifier ('standard', 'cynic', etc.).
 
     Returns:
         A tuple of (response_text, model_name) where model_name is None on error.
@@ -146,13 +169,18 @@ async def generate_response(
     if not prompt or not prompt.strip():
         return "Будь ласка, вкажіть повідомлення або запитання.", None
 
+    # Resolve active persona instruction and corresponding safety filters
+    active_persona = get_persona(persona_key)
+    sys_instruction = system_instruction or active_persona.chat_system_instruction
+    safety_settings = CYNIC_SAFETY_SETTINGS if active_persona.key == "cynic" else None
+
     # Select model from environment or fallback to default
     model_name = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
-    sys_instruction = system_instruction or DEFAULT_SYSTEM_INSTRUCTION
     llm_client = client or get_gemini_client()
     config = types.GenerateContentConfig(
         system_instruction=sys_instruction,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        safety_settings=safety_settings,
     )
 
     # Rotate through candidates to handle 404 deprecation or 429/503 spikes seamlessly
@@ -287,8 +315,9 @@ async def generate_roast(
     client: Optional[genai.Client] = None,
     chat_id: Optional[int] = None,
     user_id: Optional[int] = None,
+    persona_key: Optional[str] = None,
 ) -> tuple[str, Optional[str]]:
-    """Generates a witty standup comedy roast of a user in Ukrainian.
+    """Generates a witty or savage standup comedy roast of a user in Ukrainian.
 
     Args:
         target_name: The username or display name of the user being roasted.
@@ -296,31 +325,54 @@ async def generate_roast(
         client: Optional injected Gemini client for unit testing.
         chat_id: Optional Telegram chat identifier for telemetry attribution.
         user_id: Optional Telegram user identifier for telemetry attribution.
+        persona_key: Optional persona key ('standard' or 'cynic').
 
     Returns:
         A tuple of (roast_text, model_name) where model_name is None on failure.
     """
     clean_target = target_name.lstrip("@").strip()
-    if context_messages:
-        quotes = "\n".join(f"- {msg}" for msg in context_messages)
-        prompt = (
-            f"Влаштуй дотепний дружній роаст користувача @{clean_target}.\n"
-            f"Ось кілька його останніх реплік у цьому чаті:\n{quotes}\n\n"
-            "Обіграй ці цитати або звички у короткій, смішній стендап-прожарці (1-3 абзаци). "
-            "Відповідай виключно українською мовою."
-        )
+    active_persona = get_persona(persona_key)
+    is_cynic = active_persona.key == "cynic"
+
+    if is_cynic:
+        if context_messages:
+            quotes = "\n".join(f"- {msg}" for msg in context_messages)
+            prompt = (
+                f"Влаштуй гранично жорсткий, токсичний і нецензурний роаст користувача @{clean_target} з чорним гумором.\n"
+                f"Ось кілька його останніх реплік у цьому чаті:\n{quotes}\n\n"
+                "Рознеси ці цитати або звички у нищівній, брудній прожарці з соковитими українськими матюками та сленгом (1-3 абзаци). "
+                "Відповідай виключно українською мовою."
+            )
+        else:
+            prompt = (
+                f"Влаштуй гранично жорсткий, токсичний і нецензурний роаст користувача @{clean_target} з чорним гумором.\n"
+                "Цей боягуз поки що майже нічого не писав у цьому чаті (або прикидається мертвим). "
+                "Висмій це без жалю у брудній стендап-прожарці з соковитими українськими матюками та сленгом (1-2 абзаци). "
+                "Відповідай виключно українською мовою."
+            )
     else:
-        prompt = (
-            f"Влаштуй дотепний дружній роаст користувача @{clean_target}.\n"
-            "Цей користувач поки що майже нічого не писав у цьому чаті (або майстерно ховається у засідці). "
-            "Пожартуй над цим у короткій стендап-прожарці (1-2 абзаци). "
-            "Відповідай виключно українською мовою."
-        )
+        if context_messages:
+            quotes = "\n".join(f"- {msg}" for msg in context_messages)
+            prompt = (
+                f"Влаштуй дотепний дружній роаст користувача @{clean_target}.\n"
+                f"Ось кілька його останніх реплік у цьому чаті:\n{quotes}\n\n"
+                "Обіграй ці цитати або звички у короткій, смішній стендап-прожарці (1-3 абзаци). "
+                "Відповідай виключно українською мовою."
+            )
+        else:
+            prompt = (
+                f"Влаштуй дотепний дружній роаст користувача @{clean_target}.\n"
+                "Цей користувач поки що майже нічого не писав у цьому чаті (або майстерно ховається у засідці). "
+                "Пожартуй над цим у короткій стендап-прожарці (1-2 абзаци). "
+                "Відповідай виключно українською мовою."
+            )
 
     llm_client = client or get_gemini_client()
+    safety_settings = CYNIC_SAFETY_SETTINGS if is_cynic else None
     config = types.GenerateContentConfig(
-        system_instruction=ROAST_SYSTEM_INSTRUCTION,
+        system_instruction=active_persona.roast_system_instruction,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        safety_settings=safety_settings,
     )
 
     for model_name in get_candidate_models():
@@ -353,6 +405,7 @@ async def generate_meme_image(
     client: Optional[genai.Client] = None,
     chat_id: Optional[int] = None,
     user_id: Optional[int] = None,
+    persona_key: Optional[str] = None,
 ) -> tuple[Optional[bytes], Optional[str], Optional[str], Optional[str]]:
     """Generates an image/meme using Google's Nano Banana multimodal models.
 
@@ -361,6 +414,7 @@ async def generate_meme_image(
         client: Optional injected Gemini client for testing.
         chat_id: Optional Telegram chat identifier for telemetry.
         user_id: Optional Telegram user identifier for telemetry.
+        persona_key: Optional persona identifier ('standard', 'cynic', etc.).
 
     Returns:
         A tuple of (image_bytes, mime_type, error_message, model_name).
@@ -368,15 +422,15 @@ async def generate_meme_image(
     if not prompt or not prompt.strip():
         return None, None, "Будь ласка, вкажіть опис для зображення.", None
 
-    full_prompt = (
-        f"A funny, high-quality meme illustration: {prompt.strip()}. "
-        "Clear composition, witty visual humor."
-    )
+    active_persona = get_persona(persona_key)
+    full_prompt = active_persona.meme_prompt_template.format(prompt=prompt.strip())
 
     llm_client = client or get_gemini_client()
+    safety_settings = CYNIC_SAFETY_SETTINGS if active_persona.key == "cynic" else None
     config = types.GenerateContentConfig(
         response_modalities=["IMAGE"],
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        safety_settings=safety_settings,
     )
 
     for model_name in get_candidate_image_models():

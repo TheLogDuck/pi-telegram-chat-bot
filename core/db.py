@@ -92,6 +92,16 @@ def init_db(db_path: Optional[str] = None) -> None:
             ON access_grants (entity_type, entity_id, status);
             """
         )
+        # Table to track user-selected personas across private chats and groups
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_personas (
+                user_id INTEGER PRIMARY KEY,
+                persona_key TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
         conn.commit()
 
 def save_message(
@@ -545,6 +555,60 @@ async def async_set_access_status(
 async def async_get_all_access_grants(db_path: Optional[str] = None) -> list[dict]:
     """Non-blocking async wrapper to list all access grants."""
     return await asyncio.to_thread(get_all_access_grants, db_path)
+
+
+def get_user_persona(user_id: int, db_path: Optional[str] = None) -> str:
+    """Retrieves the configured persona key for a user, defaulting to 'standard'."""
+    if not isinstance(user_id, int):
+        return "standard"
+
+    path = db_path or get_db_path()
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT persona_key FROM user_personas
+            WHERE user_id = ?;
+            """,
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        if row:
+            return row["persona_key"]
+    return "standard"
+
+
+def set_user_persona(user_id: int, persona_key: str, db_path: Optional[str] = None) -> None:
+    """Persists or updates the active persona key chosen by a specific user."""
+    if not isinstance(user_id, int):
+        return
+
+    path = db_path or get_db_path()
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO user_personas (user_id, persona_key, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                persona_key = excluded.persona_key,
+                updated_at = excluded.updated_at;
+            """,
+            (user_id, persona_key, now),
+        )
+        conn.commit()
+
+
+async def async_get_user_persona(user_id: int, db_path: Optional[str] = None) -> str:
+    """Non-blocking async wrapper to fetch a user's selected persona."""
+    return await asyncio.to_thread(get_user_persona, user_id, db_path)
+
+
+async def async_set_user_persona(user_id: int, persona_key: str, db_path: Optional[str] = None) -> None:
+    """Non-blocking async wrapper to save a user's selected persona."""
+    await asyncio.to_thread(set_user_persona, user_id, persona_key, db_path)
+
 
 
 

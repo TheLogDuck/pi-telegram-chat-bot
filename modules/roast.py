@@ -4,7 +4,7 @@ from typing import Optional
 from telegram import Update
 from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
-from core.db import async_get_user_messages
+from core.db import async_get_user_messages, async_get_user_persona
 from core.llm import generate_roast
 from core.logger import setup_logger
 from core.telegram_utils import format_reply_with_model, is_bot_mentioned, send_formatted_reply
@@ -82,10 +82,16 @@ async def roast_command(
             if not context_messages or replied_quote not in context_messages:
                 context_messages = [replied_quote] + (context_messages or [])
 
-    # Step 3: Generate the humorous Ukrainian standup roast
+    # Step 3: Fetch caller persona and generate Ukrainian standup roast
+    caller_id = update.effective_user.id if update.effective_user else None
+    persona_key = await async_get_user_persona(caller_id) if caller_id else "standard"
+
     result = await generate_roast(
         target_name=target_name,
         context_messages=context_messages,
+        chat_id=chat.id,
+        user_id=caller_id,
+        persona_key=persona_key,
     )
     if isinstance(result, tuple):
         roast_text, model_used = result

@@ -5,6 +5,7 @@ from typing import Optional
 from telegram import Update
 from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
+from core.db import async_get_user_persona
 from core.llm import generate_meme_image
 from core.logger import setup_logger
 
@@ -46,14 +47,16 @@ async def meme_command(
     except Exception as exc:
         logger.warning(f"Failed to send upload_photo chat action: {exc}")
 
-    # Extract user ID for telemetry attribution
+    # Extract user ID for telemetry attribution and persona lookup
     user_id = message.from_user.id if message.from_user else None
+    persona_key = await async_get_user_persona(user_id) if user_id else "standard"
 
     # Asynchronously generate the meme image via Nano Banana
     result = await generate_meme_image(
         prompt=target_prompt,
         chat_id=chat.id,
         user_id=user_id,
+        persona_key=persona_key,
     )
     if len(result) == 4:
         image_bytes, mime_type, error_msg, model_used = result

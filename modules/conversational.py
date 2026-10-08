@@ -5,6 +5,7 @@ from typing import Optional
 from telegram import Update
 from telegram.constants import ChatAction, ChatType, ParseMode
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
+from core.db import async_get_user_persona
 from core.llm import generate_response
 from core.logger import setup_logger
 from modules.analytics import stats_command
@@ -13,6 +14,7 @@ from modules.intent import IntentType, detect_intent
 from modules.news import news_command
 from modules.roast import roast_command
 from modules.meme import meme_command
+from modules.persona import persona_command
 
 logger = setup_logger("conversational")
 
@@ -83,6 +85,9 @@ async def conversational_chat_handler(
     elif intent_result.intent == IntentType.MEME:
         await meme_command(update, context, prompt=intent_result.topic)
         return
+    elif intent_result.intent == IntentType.PERSONA:
+        await persona_command(update, context)
+        return
 
     # Inform the user that Gemini is processing their response
     try:
@@ -94,8 +99,17 @@ async def conversational_chat_handler(
         # Non-critical warning if typing action fails (e.g. transient network hiccup)
         logger.warning(f"Failed to send typing chat action: {exc}")
 
-    # Generate response via the non-blocking Gemini wrapper
-    result = await generate_response(cleaned_prompt)
+    # Extract caller user ID to look up their chosen persona
+    user_id = message.from_user.id if message.from_user else None
+    persona_key = await async_get_user_persona(user_id) if user_id else "standard"
+
+    # Generate response via the non-blocking Gemini wrapper with user's persona
+    result = await generate_response(
+        cleaned_prompt,
+        chat_id=chat.id,
+        user_id=user_id,
+        persona_key=persona_key,
+    )
     if isinstance(result, tuple):
         ai_response, model_used = result
     else:
