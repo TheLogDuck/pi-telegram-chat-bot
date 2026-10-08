@@ -8,8 +8,22 @@ from core.logger import setup_logger
 
 logger = setup_logger("llm")
 
-# Default model configuration; can be overridden via GEMINI_MODEL env var
-DEFAULT_MODEL = "gemini-2.5-flash"
+# Default primary model and ordered rotation candidates for free-tier resilience
+DEFAULT_MODEL = "gemini-3.8-flash"
+MODEL_ROTATION_CANDIDATES = [
+    "gemini-3.8-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+]
+
+def get_candidate_models() -> list[str]:
+    """Returns ordered list of models for automatic failover and quota rotation."""
+    configured = os.getenv("GEMINI_MODEL")
+    if configured:
+        return [configured] + [m for m in MODEL_ROTATION_CANDIDATES if m != configured]
+    return list(MODEL_ROTATION_CANDIDATES)
 
 # System instruction enforces understanding UA/RU/EN while speaking strictly in Ukrainian
 DEFAULT_SYSTEM_INSTRUCTION = (
@@ -62,34 +76,29 @@ async def generate_response(
     # Select model from environment or fallback to default
     model_name = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
     sys_instruction = system_instruction or DEFAULT_SYSTEM_INSTRUCTION
+    llm_client = client or get_gemini_client()
+    config = types.GenerateContentConfig(system_instruction=sys_instruction)
 
-    try:
-        # Use provided client or initialize a new one
-        llm_client = client or get_gemini_client()
+    # Rotate through candidates to handle 404 deprecation or 429/503 spikes seamlessly
+    for model_name in get_candidate_models():
+        try:
+            response = await llm_client.aio.models.generate_content(
+                model=model_name,
+                contents=prompt.strip(),
+                config=config,
+            )
+            if response and response.text:
+                return response.text.strip()
+            logger.warning(f"Model {model_name} returned empty text.")
+        except Exception as exc:
+            logger.warning(
+                f"Model {model_name} encountered an error: {exc}. "
+                "Rotating to next fallback model..."
+            )
+            continue
 
-        # GenerateContentConfig configures generation parameters like system instructions
-        config = types.GenerateContentConfig(
-            system_instruction=sys_instruction,
-        )
-
-        # Call the asynchronous API namespace (.aio) so the event loop is never blocked
-        response = await llm_client.aio.models.generate_content(
-            model=model_name,
-            contents=prompt.strip(),
-            config=config,
-        )
-
-        # Extract text content safely
-        if response and response.text:
-            return response.text.strip()
-
-        logger.warning("Gemini returned an empty response text.")
-        return API_ERROR_MESSAGE
-
-    except Exception as exc:
-        # Catch network timeouts, invalid keys, or quota errors without crashing the bot
-        logger.error(f"Error communicating with Gemini API: {exc}")
-        return API_ERROR_MESSAGE
+    logger.error("All Gemini model candidates exhausted.")
+    return API_ERROR_MESSAGE
 
 
 # System instruction specifically for grounding news briefings in Ukrainian
@@ -106,6 +115,8 @@ async def generate_news_briefing(
 ) -> str:
     """Asynchronously generates a news briefing grounded with Google Search.
 
+    Rotates through candidate models if rate limits or unavailable errors occur.
+
     Args:
         topic: Optional subject filter (e.g. 'технології', 'штучний інтелект').
         client: Optional injected client for unit testing.
@@ -113,8 +124,6 @@ async def generate_news_briefing(
     Returns:
         Structured news briefing in Ukrainian, or a friendly error message.
     """
-    model_name = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
-
     if topic and topic.strip():
         prompt = (
             f"Підготуй стислий інформаційний дайджест останніх актуальних новин "
@@ -126,27 +135,29 @@ async def generate_news_briefing(
             "та технологічних новин на сьогодні."
         )
 
-    try:
-        llm_client = client or get_gemini_client()
+    llm_client = client or get_gemini_client()
+    config = types.GenerateContentConfig(
+        system_instruction=NEWS_SYSTEM_INSTRUCTION,
+        tools=[types.Tool(google_search=types.GoogleSearch())],
+    )
 
-        # Configure Google Search grounding tool to retrieve live real-time news
-        config = types.GenerateContentConfig(
-            system_instruction=NEWS_SYSTEM_INSTRUCTION,
-            tools=[types.Tool(google_search=types.GoogleSearch())],
-        )
+    # Rotate through candidates for resilient grounded search execution
+    for model_name in get_candidate_models():
+        try:
+            response = await llm_client.aio.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=config,
+            )
+            if response and response.text:
+                return response.text.strip()
+            logger.warning(f"Model {model_name} returned empty text for news briefing.")
+        except Exception as exc:
+            logger.warning(
+                f"Grounded search with model {model_name} failed: {exc}. "
+                "Rotating to next candidate model..."
+            )
+            continue
 
-        response = await llm_client.aio.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=config,
-        )
-
-        if response and response.text:
-            return response.text.strip()
-
-        logger.warning("Gemini returned empty text for news briefing.")
-        return API_ERROR_MESSAGE
-
-    except Exception as exc:
-        logger.error(f"Error generating grounded news briefing: {exc}")
-        return API_ERROR_MESSAGE
+    logger.error("All candidate models failed during grounded news briefing.")
+    return API_ERROR_MESSAGE
