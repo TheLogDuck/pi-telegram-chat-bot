@@ -18,6 +18,11 @@ MODEL_ROTATION_CANDIDATES = [
     "gemini-flash-lite-latest",
 ]
 
+# Track whether Google Search tool quota is available on this API key.
+# On Free Tier accounts, this disables cleanly on the first 429 to avoid retry storms.
+_search_grounding_available = os.getenv("ENABLE_SEARCH_GROUNDING", "true").lower() in ("true", "1", "yes")
+
+
 def get_candidate_models() -> list[str]:
     """Returns ordered list of models for automatic failover and quota rotation."""
     configured = os.getenv("GEMINI_MODEL")
@@ -77,7 +82,10 @@ async def generate_response(
     model_name = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
     sys_instruction = system_instruction or DEFAULT_SYSTEM_INSTRUCTION
     llm_client = client or get_gemini_client()
-    config = types.GenerateContentConfig(system_instruction=sys_instruction)
+    config = types.GenerateContentConfig(
+        system_instruction=sys_instruction,
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+    )
 
     # Rotate through candidates to handle 404 deprecation or 429/503 spikes seamlessly
     for model_name in get_candidate_models():
@@ -135,34 +143,39 @@ async def generate_news_briefing(
             "та технологічних новин на сьогодні."
         )
 
+    global _search_grounding_available
     llm_client = client or get_gemini_client()
-    config = types.GenerateContentConfig(
-        system_instruction=NEWS_SYSTEM_INSTRUCTION,
-        tools=[types.Tool(google_search=types.GoogleSearch())],
-    )
 
-    # Rotate through candidates for resilient grounded search execution
-    for model_name in get_candidate_models():
-        try:
-            response = await llm_client.aio.models.generate_content(
-                model=model_name,
-                contents=prompt,
-                config=config,
-            )
-            if response and response.text:
-                return response.text.strip()
-            logger.warning(f"Model {model_name} returned empty text for news briefing.")
-        except Exception as exc:
-            logger.warning(
-                f"Grounded search with model {model_name} failed: {exc}. "
-                "Rotating to next candidate model..."
-            )
-            continue
+    # Attempt Grounded Search with Google Search tool only if quota is available
+    if _search_grounding_available:
+        config = types.GenerateContentConfig(
+            system_instruction=NEWS_SYSTEM_INSTRUCTION,
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        )
+        for model_name in get_candidate_models():
+            try:
+                response = await llm_client.aio.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=config,
+                )
+                if response and response.text:
+                    return response.text.strip()
+                logger.warning(f"Model {model_name} returned empty text for news briefing.")
+            except Exception as exc:
+                exc_str = str(exc)
+                if "429" in exc_str or "RESOURCE_EXHAUSTED" in exc_str:
+                    logger.info("Search tool quota unavailable on Free Tier (429). Switching to standard AI synthesis.")
+                    _search_grounding_available = False
+                    break
+                logger.warning(f"Grounded search with model {model_name} failed: {exc}. Trying next candidate...")
+                continue
 
-    # Fallback to standard model synthesis if Google Search tool quota is exhausted (Free Tier)
-    logger.info("Search tool quota unavailable on Free Tier. Falling back to standard AI synthesis...")
+    # Fallback to standard model synthesis (fast, zero external tool quota requirement)
     standard_config = types.GenerateContentConfig(
         system_instruction=NEWS_SYSTEM_INSTRUCTION,
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
     for model_name in get_candidate_models():
         try:
@@ -227,6 +240,7 @@ async def generate_roast(
     llm_client = client or get_gemini_client()
     config = types.GenerateContentConfig(
         system_instruction=ROAST_SYSTEM_INSTRUCTION,
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
 
     for model_name in get_candidate_models():
