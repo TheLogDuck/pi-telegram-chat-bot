@@ -104,7 +104,10 @@ def test_conversational_handler_empty_tag_greeting() -> None:
 
     asyncio.run(conversational_chat_handler(update, context))
 
-    update.effective_message.reply_text.assert_awaited_once_with(EMPTY_TAG_PROMPT)
+    update.effective_message.reply_text.assert_awaited_once_with(
+        EMPTY_TAG_PROMPT,
+        parse_mode=ParseMode.HTML,
+    )
 
 
 @patch("modules.conversational.generate_response", new_callable=AsyncMock)
@@ -141,7 +144,10 @@ def test_conversational_handler_dispatches_ping_intent() -> None:
 
     asyncio.run(conversational_chat_handler(update, context))
 
-    update.effective_message.reply_text.assert_awaited_once_with(PING_TEXT)
+    update.effective_message.reply_text.assert_awaited_once_with(
+        PING_TEXT,
+        parse_mode=ParseMode.HTML,
+    )
 
 
 def test_conversational_handler_dispatches_help_intent() -> None:

@@ -171,3 +171,46 @@ def test_async_cleanup_old_messages(tmp_path):
     assert deleted == 1
 
 
+def test_access_grants_operations(tmp_path):
+    """Verifies access control whitelist queries, request creation, and updates."""
+    from core.db import (
+        async_get_all_access_grants,
+        async_get_or_create_access_request,
+        async_is_entity_approved,
+        async_set_access_status,
+        init_db,
+        is_entity_approved,
+    )
+
+    test_db = str(tmp_path / "test_memory.db")
+    init_db(test_db)
+
+    # Initially, user 42 is not approved
+    assert not is_entity_approved("user", 42, db_path=test_db)
+
+    # Create access request for user 42
+    status, is_new = asyncio.run(
+        async_get_or_create_access_request("user", 42, "test_user", db_path=test_db)
+    )
+    assert status == "pending"
+    assert is_new is True
+
+    # Duplicate call returns pending and is_new=False
+    status2, is_new2 = asyncio.run(
+        async_get_or_create_access_request("user", 42, "test_user", db_path=test_db)
+    )
+    assert status2 == "pending"
+    assert is_new2 is False
+
+    # Approve user 42
+    asyncio.run(async_set_access_status("user", 42, "approved", db_path=test_db))
+    assert asyncio.run(async_is_entity_approved("user", 42, db_path=test_db)) is True
+
+    # Verify listing all grants
+    grants = asyncio.run(async_get_all_access_grants(db_path=test_db))
+    assert len(grants) == 1
+    assert grants[0]["entity_id"] == 42
+    assert grants[0]["status"] == "approved"
+
+
+

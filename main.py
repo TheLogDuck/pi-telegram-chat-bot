@@ -14,6 +14,7 @@ from modules.listener import register_listener
 from modules.news import register_news
 from modules.roast import register_roast
 from modules.meme import register_meme
+from modules.auth import register_auth
 
 
 logger = setup_logger("main")
@@ -45,8 +46,20 @@ async def on_startup(app: Application) -> None:
     # Register autocomplete commands in Telegram UI
     await set_bot_commands(app)
 
-    # Launch non-blocking periodic background cleanup
-    asyncio.create_task(periodic_cleanup_task())
+    # Launch non-blocking periodic background cleanup and track in bot_data
+    cleanup_task = asyncio.create_task(periodic_cleanup_task())
+    app.bot_data["cleanup_task"] = cleanup_task
+
+
+async def on_shutdown(app: Application) -> None:
+    """Gracefully cancels background tasks upon shutdown or SIGINT."""
+    task = app.bot_data.get("cleanup_task")
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 def main() -> None:
@@ -68,17 +81,21 @@ def main() -> None:
         logger.error("Missing TELEGRAM_BOT_TOKEN in .env file.")
         sys.exit(1)
 
-    # Build Telegram bot application with post_init hook for commands menu and background tasks
+    # Build Telegram bot application with lifecycle hooks for commands and tasks
     app = (
         ApplicationBuilder()
         .token(token)
         .post_init(on_startup)
+        .post_shutdown(on_shutdown)
         .build()
     )
 
 
-    # Register passive message logging handler (group -1)
+    # Register passive message logging handler (group -2)
     register_listener(app)
+
+    # Register authorization gatekeeper and admin callbacks (group -1)
+    register_auth(app)
 
     # Register standard bot commands (group 0)
     register_commands(app)

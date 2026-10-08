@@ -17,7 +17,10 @@ from modules.meme import meme_command
 logger = setup_logger("conversational")
 
 # Prompt returned when the user tags the bot without any query
-EMPTY_TAG_PROMPT = "Привіт! Чим я можу вам допомогти?"
+EMPTY_TAG_PROMPT = (
+    "<b>Привіт!</b> Чим я можу вам допомогти?\n"
+    "Напишіть своє запитання або введіть <code>/help</code> для перегляду списку команд."
+)
 
 
 from core.telegram_utils import (
@@ -52,7 +55,10 @@ async def conversational_chat_handler(
 
     # If the user only tagged the bot without asking anything, greet them
     if not cleaned_prompt:
-        await message.reply_text(EMPTY_TAG_PROMPT)
+        await message.reply_text(
+            EMPTY_TAG_PROMPT,
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     # Check for natural language or slash command intents

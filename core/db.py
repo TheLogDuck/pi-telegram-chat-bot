@@ -71,6 +71,27 @@ def init_db(db_path: Optional[str] = None) -> None:
             ON token_usage (timestamp);
             """
         )
+        # Table to track access control whitelist approvals for users and group chats
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS access_grants (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_type TEXT NOT NULL,
+                entity_id INTEGER NOT NULL,
+                entity_title TEXT,
+                status TEXT NOT NULL,
+                requested_at TEXT NOT NULL,
+                reviewed_at TEXT,
+                UNIQUE(entity_type, entity_id)
+            );
+            """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_access_grants_lookup
+            ON access_grants (entity_type, entity_id, status);
+            """
+        )
         conn.commit()
 
 def save_message(
@@ -387,6 +408,145 @@ async def async_cleanup_old_messages(
 ) -> int:
     """Non-blocking async wrapper delegating message cleanup to worker thread."""
     return await asyncio.to_thread(cleanup_old_messages, retention_days, db_path)
+
+
+def is_entity_approved(
+    entity_type: str,
+    entity_id: int,
+    db_path: Optional[str] = None,
+) -> bool:
+    """Checks whether a user or chat has an approved status in access_grants."""
+    path = db_path or get_db_path()
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT status FROM access_grants
+            WHERE entity_type = ? AND entity_id = ?;
+            """,
+            (entity_type, entity_id),
+        )
+        row = cursor.fetchone()
+        return bool(row and row["status"] == "approved")
+
+
+def get_or_create_access_request(
+    entity_type: str,
+    entity_id: int,
+    entity_title: Optional[str] = None,
+    db_path: Optional[str] = None,
+) -> tuple[str, bool]:
+    """Retrieves existing request status, or creates a pending record if new.
+
+    Returns:
+        tuple[str, bool]: (status, is_new) where is_new is True if inserted.
+    """
+    path = db_path or get_db_path()
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT status FROM access_grants
+            WHERE entity_type = ? AND entity_id = ?;
+            """,
+            (entity_type, entity_id),
+        )
+        row = cursor.fetchone()
+        if row:
+            return row["status"], False
+
+        now = datetime.now(timezone.utc).isoformat()
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO access_grants (
+                entity_type, entity_id, entity_title, status, requested_at
+            ) VALUES (?, ?, ?, 'pending', ?);
+            """,
+            (entity_type, entity_id, entity_title, now),
+        )
+        conn.commit()
+        return "pending", True
+
+
+def set_access_status(
+    entity_type: str,
+    entity_id: int,
+    status: str,
+    entity_title: Optional[str] = None,
+    db_path: Optional[str] = None,
+) -> None:
+    """Updates or inserts access status (approved, rejected, pending) for a user or chat."""
+    path = db_path or get_db_path()
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO access_grants (
+                entity_type, entity_id, entity_title, status, requested_at, reviewed_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+                status = excluded.status,
+                reviewed_at = excluded.reviewed_at,
+                entity_title = COALESCE(excluded.entity_title, access_grants.entity_title);
+            """,
+            (entity_type, entity_id, entity_title, status, now, now),
+        )
+        conn.commit()
+
+
+def get_all_access_grants(db_path: Optional[str] = None) -> list[dict]:
+    """Retrieves all tracked access requests and their statuses."""
+    path = db_path or get_db_path()
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, entity_type, entity_id, entity_title, status, requested_at, reviewed_at
+            FROM access_grants
+            ORDER BY requested_at DESC;
+            """
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+async def async_is_entity_approved(
+    entity_type: str,
+    entity_id: int,
+    db_path: Optional[str] = None,
+) -> bool:
+    """Non-blocking async wrapper to check if an entity is approved."""
+    return await asyncio.to_thread(is_entity_approved, entity_type, entity_id, db_path)
+
+
+async def async_get_or_create_access_request(
+    entity_type: str,
+    entity_id: int,
+    entity_title: Optional[str] = None,
+    db_path: Optional[str] = None,
+) -> tuple[str, bool]:
+    """Non-blocking async wrapper to fetch or create an access request."""
+    return await asyncio.to_thread(
+        get_or_create_access_request, entity_type, entity_id, entity_title, db_path
+    )
+
+
+async def async_set_access_status(
+    entity_type: str,
+    entity_id: int,
+    status: str,
+    entity_title: Optional[str] = None,
+    db_path: Optional[str] = None,
+) -> None:
+    """Non-blocking async wrapper to update access status."""
+    await asyncio.to_thread(set_access_status, entity_type, entity_id, status, entity_title, db_path)
+
+
+async def async_get_all_access_grants(db_path: Optional[str] = None) -> list[dict]:
+    """Non-blocking async wrapper to list all access grants."""
+    return await asyncio.to_thread(get_all_access_grants, db_path)
+
+
 
 
 

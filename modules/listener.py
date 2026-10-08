@@ -38,12 +38,12 @@ async def passive_message_listener(
         logger.error(f"Failed to passively record message: {exc}")
 
 def register_listener(app: Application) -> None:
-    """Registers the passive logging handler in handler group -1.
+    """Registers the passive logging handler in handler group -2.
     
-    Handler group -1 runs before any standard command handlers (group 0)
-    and does not block them.
+    Handler group -2 runs first to record all messages before the auth gatekeeper
+    (group -1) and command handlers (group 0).
     """
     app.add_handler(
         MessageHandler(filters.TEXT, passive_message_listener),
-        group=-1,
+        group=-2,
     )

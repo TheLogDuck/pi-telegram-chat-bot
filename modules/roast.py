@@ -2,7 +2,7 @@
 # Supports slash command /roast <user>, message replies, and natural language triggers.
 from typing import Optional
 from telegram import Update
-from telegram.constants import ChatAction
+from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 from core.db import async_get_user_messages
 from core.llm import generate_roast
@@ -12,8 +12,8 @@ from core.telegram_utils import format_reply_with_model, is_bot_mentioned, send_
 logger = setup_logger("roast")
 
 NO_TARGET_HELP_TEXT = (
-    "Кому саме влаштувати прожарку? Будь ласка, вкажіть користувача через @, "
-    "наприклад: `/roast @username`, або надішліть команду у відповідь (reply) на його повідомлення."
+    "<b>Кому саме влаштувати прожарку?</b> Будь ласка, вкажіть користувача через <code>@</code>, "
+    "наприклад: <code>/roast @username</code>, або надішліть команду у відповідь (reply) на його повідомлення."
 )
 
 
@@ -49,7 +49,7 @@ async def roast_command(
 
     # If no target could be determined, explain how to use the command
     if not target_name:
-        await send_formatted_reply(message, NO_TARGET_HELP_TEXT)
+        await message.reply_text(NO_TARGET_HELP_TEXT, parse_mode=ParseMode.HTML)
         return
 
     # In group chats, ensure bot speaks only when tagged

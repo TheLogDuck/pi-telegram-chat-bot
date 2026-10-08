@@ -127,52 +127,6 @@ sequenceDiagram
 
 ---
 
-## Project Structure & Architecture
-
-```text
-pi-telegram-chat-bot/
-├── core/
-│   ├── db.py               # Asynchronous SQLite operations with WAL configuration & pruning
-│   ├── error_handler.py    # Global uncaught exception handler and admin notification dispatcher
-│   ├── llm.py              # Gemini client with model rotation, Imagen generation, and cost tracking
-│   ├── logger.py           # Rotating file logger capped at 6 MB total disk space
-│   └── telegram_utils.py   # Formatting utilities, tag extraction, and safe message chunking
-├── modules/
-│   ├── analytics.py        # Owner-only API token accounting, request counters, and cost reports
-│   ├── commands.py         # Standard handlers (/start, /help, /ping) and Telegram UI menu builder
-│   ├── conversational.py   # AI conversation router enforcing group mention rules and context fetching
-│   ├── intent.py           # Zero-dependency fuzzy intent classifier (EN, UK, RU) using difflib
-│   ├── listener.py         # Passive message recording module for chat context and analytics
-│   ├── media.py            # Media ingestion and Telegram attachment processing
-│   ├── meme.py             # Generative AI meme and illustration engine with prompt expansion
-│   ├── news.py             # Grounded news digest module with real-time Google Search retrieval
-│   └── roast.py            # Standup comedy roast generator using SQLite message history
-├── systemd/
-│   └── telegram-bot.service # Production systemd unit template with strict cgroup limits
-├── tests/
-│   ├── e2e_tester.py       # Headless synthetic client test runner for end-to-end integration tests
-│   ├── test_analytics.py   # Unit tests for token calculations and owner access control
-│   ├── test_commands.py    # Unit tests for command parsing and responses
-│   ├── test_conversational.py # Unit tests for conversational routing and group mention validation
-│   ├── test_db.py          # Unit tests for SQLite WAL concurrency, schemas, and pruning
-│   ├── test_error_handler.py # Unit tests for uncaught exception handling
-│   ├── test_intent.py      # Unit tests for fuzzy intent classification and typo tolerance
-│   ├── test_llm.py         # Unit tests for model failover cascades and cost tracking
-│   ├── test_logger.py      # Unit tests for log rotation and formatters
-│   ├── test_meme.py        # Unit tests for generative meme prompt handling and model rotation
-│   ├── test_news.py        # Unit tests for Google Search grounding and fallback logic
-│   ├── test_roast.py       # Unit tests for history retrieval and roast prompt generation
-│   └── test_telegram_utils.py # Unit tests for string escaping and chunking
-├── .env.example            # Environment variable template
-├── deploy.sh               # Pull-based deployment pipeline with automated test gatekeeper
-├── INFRASTRUCTURE.md       # Operational runbook for edge server and Tailscale configuration
-├── main.py                 # Application bootstrap, background task scheduler, and polling runner
-├── requirements.txt        # Strictly pinned minimal dependencies
-└── README.md               # Public project documentation and engineering overview
-```
-
----
-
 ## Core Capabilities & Features
 
 ### 1. Conversational AI with Group Context
@@ -208,6 +162,12 @@ pi-telegram-chat-bot/
 - Captures `prompt_token_count` and `candidates_token_count` from API response metadata for every LLM interaction.
 - Computes estimated dollar costs in real time according to provider pricing tiers.
 - Restricted to the bot administrator (`ADMIN_CHAT_ID`) to provide transparency on daily and cumulative API usage broken down by feature.
+
+### 8. Manual Gatekeeper & Access Control Whitelist (`/approve`, `/reject`, `/access`)
+- Protects the bot from unauthorized exposure with a manual approval workflow.
+- Hybrid authorization scope: whitelists group chats as a whole and whitelists users individually in private messages.
+- When an unauthorized entity addresses the bot, the administrator receives a Telegram alert with interactive `[Схвалити]` and `[Відхилити]` inline buttons.
+- Features sub-microsecond in-memory caching and SQLite persistence in the `access_grants` table.
 
 ---
 

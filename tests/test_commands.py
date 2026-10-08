@@ -14,7 +14,7 @@ from modules.commands import (
     set_bot_commands,
     start_command,
 )
-from modules.analytics import stats_command
+from modules.analytics import NON_OWNER_MESSAGE, stats_command
 
 
 def make_mock_update() -> MagicMock:
@@ -32,19 +32,39 @@ def test_start_command() -> None:
 
     asyncio.run(start_command(mock_update, mock_context))
 
-    mock_update.effective_message.reply_text.assert_awaited_once_with(START_TEXT)
+    mock_update.effective_message.reply_text.assert_awaited_once_with(
+        START_TEXT,
+        parse_mode=ParseMode.HTML,
+    )
 
-def test_help_command() -> None:
-    """Verifies that /help sends the command directory."""
+def test_help_command_regular_user() -> None:
+    """Verifies that /help sends the public command directory to regular users."""
     mock_update = make_mock_update()
+    mock_update.effective_user.id = 11111  # Regular user
     mock_context = MagicMock()
 
     asyncio.run(help_command(mock_update, mock_context))
 
-    mock_update.effective_message.reply_text.assert_awaited_once_with(
-        HELP_TEXT,
-        parse_mode=ParseMode.HTML,
-    )
+    call_text = mock_update.effective_message.reply_text.call_args[0][0]
+    assert "Основні команди:" in call_text
+    assert "Адміністрування:" not in call_text
+
+
+def test_help_command_admin(monkeypatch) -> None:
+    """Verifies that /help includes administrative tools when called by the owner."""
+    monkeypatch.setenv("ADMIN_CHAT_ID", "77777")
+    mock_update = make_mock_update()
+    mock_update.effective_user.id = 77777  # Admin user
+    mock_context = MagicMock()
+
+    asyncio.run(help_command(mock_update, mock_context))
+
+    call_text = mock_update.effective_message.reply_text.call_args[0][0]
+    assert "Адміністрування:" in call_text
+    assert "/access" in call_text
+    assert "/approve" in call_text
+    assert "/reject" in call_text
+
 
 def test_ping_command() -> None:
     """Verifies that /ping sends the fast heartbeat pong message."""
@@ -53,7 +73,11 @@ def test_ping_command() -> None:
 
     asyncio.run(ping_command(mock_update, mock_context))
 
-    mock_update.effective_message.reply_text.assert_awaited_once_with(PING_TEXT)
+    mock_update.effective_message.reply_text.assert_awaited_once_with(
+        PING_TEXT,
+        parse_mode=ParseMode.HTML,
+    )
+
 
 def test_stats_command_non_owner(monkeypatch) -> None:
     """Verifies that /stats denies access to unauthorized non-owner users."""
@@ -65,7 +89,8 @@ def test_stats_command_non_owner(monkeypatch) -> None:
     asyncio.run(stats_command(mock_update, mock_context))
 
     mock_update.effective_message.reply_text.assert_awaited_once_with(
-        "Ця команда доступна виключно адміністратору бота."
+        NON_OWNER_MESSAGE,
+        parse_mode=ParseMode.HTML,
     )
 
 
@@ -83,12 +108,15 @@ def test_stats_command_owner(monkeypatch) -> None:
     assert "Статистика використання Gemini API" in call_args[0][0]
 
 
-def test_set_bot_commands() -> None:
-    """Verifies that set_bot_commands sends the BOT_COMMANDS list to Telegram."""
+def test_set_bot_commands(monkeypatch) -> None:
+    """Verifies that set_bot_commands registers default scope and admin scope."""
+    monkeypatch.setenv("ADMIN_CHAT_ID", "12345")
     mock_app = MagicMock()
     mock_app.bot.set_my_commands = AsyncMock()
 
     asyncio.run(set_bot_commands(mock_app))
 
-    mock_app.bot.set_my_commands.assert_awaited_once_with(BOT_COMMANDS)
+    # Should register public commands and admin-scoped commands
+    assert mock_app.bot.set_my_commands.await_count == 2
+
 

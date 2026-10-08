@@ -65,7 +65,8 @@ def test_meme_command_success_with_args(mock_generate: AsyncMock) -> None:
     )
     update.effective_message.reply_photo.assert_awaited_once()
     call_kwargs = update.effective_message.reply_photo.await_args.kwargs
-    assert call_kwargs["caption"] == "Мем: funny cat on pi\n\nМодель: gemini-2.5-flash-image"
+    assert call_kwargs["caption"] == "<b>Мем:</b> funny cat on pi\n\n<b>Модель:</b> gemini-2.5-flash-image"
+    assert call_kwargs["parse_mode"] == ParseMode.HTML
     assert call_kwargs["photo"].read() == fake_png_bytes
 
 
@@ -89,7 +90,8 @@ def test_meme_command_injected_prompt(mock_generate: AsyncMock) -> None:
     )
     update.effective_message.reply_photo.assert_awaited_once()
     call_kwargs = update.effective_message.reply_photo.await_args.kwargs
-    assert call_kwargs["caption"] == "Мем: програмування\n\nМодель: gemini-2.5-flash-image"
+    assert call_kwargs["caption"] == "<b>Мем:</b> програмування\n\n<b>Модель:</b> gemini-2.5-flash-image"
+    assert call_kwargs["parse_mode"] == ParseMode.HTML
 
 
 @patch("modules.meme.generate_meme_image", new_callable=AsyncMock)
@@ -104,7 +106,10 @@ def test_meme_command_failure_fallback(mock_generate: AsyncMock) -> None:
 
     asyncio.run(meme_command(update, context))
 
-    update.effective_message.reply_text.assert_awaited_once_with("Помилка генерації")
+    update.effective_message.reply_text.assert_awaited_once_with(
+        "<b>Помилка генерації:</b> Помилка генерації",
+        parse_mode=ParseMode.HTML,
+    )
     update.effective_message.reply_photo.assert_not_called()
 
 

@@ -9,7 +9,7 @@ from core.logger import setup_logger
 
 logger = setup_logger("analytics")
 
-NON_OWNER_MESSAGE = "Ця команда доступна виключно адміністратору бота."
+NON_OWNER_MESSAGE = "<b>Помилка доступу:</b> Ця команда доступна виключно адміністратору бота."
 
 FEATURE_LABELS = {
     "chat": "Діалоги (Chat)",
@@ -72,7 +72,10 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     # Security check: only the bot owner can view token and billing metrics
     if not is_owner(update):
-        await update.effective_message.reply_text(NON_OWNER_MESSAGE)
+        await update.effective_message.reply_text(
+            NON_OWNER_MESSAGE,
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     # Retrieve aggregated token and dollar metrics from local SQLite

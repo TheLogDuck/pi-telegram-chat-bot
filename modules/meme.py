@@ -1,4 +1,5 @@
 # Meme generator module: produces humorous images using Gemini Nano Banana models.
+import html
 import io
 from typing import Optional
 from telegram import Update
@@ -10,7 +11,7 @@ from core.logger import setup_logger
 logger = setup_logger("meme")
 
 NO_PROMPT_MESSAGE = (
-    "Будь ласка, вкажіть опис для генерації мему. Наприклад:\n"
+    "<b>Вкажіть опис:</b> Будь ласка, вкажіть опис для генерації мему. Наприклад:\n"
     "<code>/meme кіт програміст лагодить сервер на Raspberry Pi</code>"
 )
 
@@ -64,17 +65,23 @@ async def meme_command(
         # Stream image from RAM via io.BytesIO without writing to MicroSD storage
         photo_stream = io.BytesIO(image_bytes)
         photo_stream.name = "meme.png"
+        escaped_prompt = html.escape(target_prompt)
         caption = (
-            f"Мем: {target_prompt}\n\nМодель: {model_used}"
+            f"<b>Мем:</b> {escaped_prompt}\n\n<b>Модель:</b> {html.escape(model_used)}"
             if model_used
-            else f"Мем: {target_prompt}"
+            else f"<b>Мем:</b> {escaped_prompt}"
         )
         await message.reply_photo(
             photo=photo_stream,
             caption=caption,
+            parse_mode=ParseMode.HTML,
         )
     else:
-        await message.reply_text(error_msg or "Не вдалося створити зображення.")
+        error_text = error_msg or "Не вдалося створити зображення."
+        await message.reply_text(
+            f"<b>Помилка генерації:</b> {html.escape(error_text)}",
+            parse_mode=ParseMode.HTML,
+        )
 
 
 def register_meme(app: Application) -> None:
