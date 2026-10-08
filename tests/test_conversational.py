@@ -155,7 +155,10 @@ def test_conversational_handler_dispatches_help_intent() -> None:
 
     asyncio.run(conversational_chat_handler(update, context))
 
-    update.effective_message.reply_text.assert_awaited_once_with(HELP_TEXT)
+    update.effective_message.reply_text.assert_awaited_once_with(
+        HELP_TEXT,
+        parse_mode=ParseMode.HTML,
+    )
 
 
 @patch("modules.conversational.news_command", new_callable=AsyncMock)

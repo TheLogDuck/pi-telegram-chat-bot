@@ -1,5 +1,6 @@
 # Command handlers module: provides core user commands (/start, /help, /ping).
 from telegram import BotCommand, Update
+from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 from core.logger import setup_logger
 
@@ -15,13 +16,20 @@ START_TEXT = (
 )
 
 HELP_TEXT = (
-    "Доступні команди:\n"
-    "/start - Почати взаємодію та переглянути привітання\n"
-    "/help  - Показати довідку щодо команд\n"
-    "/ping  - Перевірити доступність та час відповіді бота\n"
-    "/stats - Показати статистику активності\n"
-    "/news  - Отримати дайджест актуальних новин\n"
-    "/roast - Влаштувати дружній роаст користувача"
+    "<b>Довідка щодо команд та можливостей бота:</b>\n\n"
+    "<b>Основні команди:</b>\n"
+    "• <code>/start</code> — Початок взаємодії та коротке привітання.\n"
+    "• <code>/help</code> — Переглянути цей докладний довідник команд.\n"
+    "• <code>/ping</code> — Перевірити доступність та час відповіді бота на Raspberry Pi.\n\n"
+    "<b>Інтелектуальні функції (Gemini AI):</b>\n"
+    "• <code>/news [тема]</code> — Свіжий дайджест актуальних новин із пошуком Google.\n"
+    "  <i>Приклад:</i> <code>/news</code> (головні події) або <code>/news космос</code>.\n"
+    "• <code>/roast [@користувач]</code> — Дружня стендап-прожарка учасника на основі його повідомлень.\n"
+    "  <i>Використання:</i> вкажіть тег (<code>/roast @username</code>) або надішліть у відповідь на повідомлення.\n"
+    "• <b>Спілкування з ШІ:</b>\n"
+    "  В особистих чатах пишіть будь-що напряму, а в групах — згадуйте через тег або reply.\n\n"
+    "<b>Адміністрування:</b>\n"
+    "• <code>/stats</code> — Детальна статистика токенів Gemini (Tier 1), запитів та вартості (тільки для власника)."
 )
 
 PING_TEXT = "Понг! Бот активний і працює на Raspberry Pi."
@@ -36,7 +44,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Sends the command directory when /help is issued."""
     if update.effective_message:
         # Uses constant string, avoiding heap allocation and CPU overhead
-        await update.effective_message.reply_text(HELP_TEXT)
+        await update.effective_message.reply_text(
+            HELP_TEXT,
+            parse_mode=ParseMode.HTML,
+        )
 
 async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Replies immediately to verify the event loop is responsive."""

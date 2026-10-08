@@ -3,6 +3,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 from telegram import Update
+from telegram.constants import ParseMode
 from modules.commands import (
     BOT_COMMANDS,
     HELP_TEXT,
@@ -40,7 +41,10 @@ def test_help_command() -> None:
 
     asyncio.run(help_command(mock_update, mock_context))
 
-    mock_update.effective_message.reply_text.assert_awaited_once_with(HELP_TEXT)
+    mock_update.effective_message.reply_text.assert_awaited_once_with(
+        HELP_TEXT,
+        parse_mode=ParseMode.HTML,
+    )
 
 def test_ping_command() -> None:
     """Verifies that /ping sends the fast heartbeat pong message."""
