@@ -125,9 +125,10 @@ async def auth_gatekeeper(
         entity_id = chat.id
         entity_title = chat.title or f"Group {chat.id}"
 
-        # Allow admin management commands (/approve, /reject, /access) to pass through
-        if is_admin(user.id) and message.text and message.text.strip().startswith(("/approve", "/reject", "/access")):
+        # Allow admin management commands (/approve, /reject, /access, /switch_reaction) to pass through
+        if is_admin(user.id) and message.text and message.text.strip().startswith(("/approve", "/reject", "/access", "/switch_reaction")):
             return
+
 
     # Verify authorization status
     if await is_authorized(entity_type, entity_id):

@@ -41,8 +41,10 @@ ADMIN_HELP_TEXT = (
     "• <code>/access</code> — Список запитів та статусів доступу.\n"
     "• <code>/approve [id]</code> — Надати доступ користувачу або групі.\n"
     "• <code>/reject [id]</code> — Відхилити або відкликати доступ.\n"
-    "• <code>/stats</code> — Детальна статистика токенів Gemini (Tier 1) та витрат."
+    "• <code>/stats</code> — Детальна статистика токенів Gemini (Tier 1) та витрат.\n"
+    "• <code>/switch_reaction [id]</code> — Увімкнути або вимкнути емоційні реакції бота для чату."
 )
+
 
 HELP_TEXT = PUBLIC_HELP_TEXT
 PING_TEXT = "<b>Понг!</b> Бот активний і працює на Raspberry Pi."
@@ -104,7 +106,9 @@ ADMIN_BOT_COMMANDS = PUBLIC_BOT_COMMANDS + [
     BotCommand("access", "Список запитів та статусів доступу"),
     BotCommand("approve", "Схвалити доступ для ID або групи"),
     BotCommand("reject", "Відхилити або відкликати доступ"),
+    BotCommand("switch_reaction", "Увімкнути або вимкнути емоційні реакції для чату"),
 ]
+
 
 
 async def set_bot_commands(app: Application) -> None:

@@ -64,6 +64,8 @@ def test_help_command_admin(monkeypatch) -> None:
     assert "/access" in call_text
     assert "/approve" in call_text
     assert "/reject" in call_text
+    assert "/switch_reaction" in call_text
+
 
 
 def test_ping_command() -> None:

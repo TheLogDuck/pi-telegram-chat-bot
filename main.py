@@ -16,6 +16,8 @@ from modules.roast import register_roast
 from modules.meme import register_meme
 from modules.auth import register_auth
 from modules.persona import register_persona
+from modules.reactions import register_reactions
+
 
 
 logger = setup_logger("main")
@@ -105,8 +107,10 @@ def main() -> None:
     register_news(app)
     register_roast(app)
     register_meme(app)
+    register_reactions(app)
 
     # Register conversational AI chat handler (group 0)
+
     register_conversational(app)
 
     # Register global uncaught error handler

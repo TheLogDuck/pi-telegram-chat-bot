@@ -102,6 +102,16 @@ def init_db(db_path: Optional[str] = None) -> None:
             );
             """
         )
+        # Table to track per-chat reaction switch settings
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_reaction_settings (
+                chat_id INTEGER PRIMARY KEY,
+                enabled INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
         conn.commit()
 
 def save_message(
@@ -154,6 +164,44 @@ async def async_save_message(
     )
 
 
+def get_chat_messages(
+    chat_id: int,
+    username: Optional[str] = None,
+    user_id: Optional[int] = None,
+    limit: int = 10,
+    before_id: Optional[int] = None,
+    db_path: Optional[str] = None,
+) -> list[dict]:
+    """Unified function to retrieve recent non-command messages in chronological order."""
+    path = db_path or get_db_path()
+    clean_username = username.lstrip("@").lower() if username else None
+    query = "SELECT id, user_id, username, text, timestamp FROM messages WHERE chat_id = ? AND text NOT LIKE '/%'"
+    params: list = [chat_id]
+
+    if clean_username and user_id is not None:
+        query += " AND (LOWER(username) = ? OR user_id = ?)"
+        params.extend([clean_username, user_id])
+    elif clean_username:
+        query += " AND LOWER(username) = ?"
+        params.append(clean_username)
+    elif user_id is not None:
+        query += " AND user_id = ?"
+        params.append(user_id)
+
+    if before_id is not None:
+        query += " AND id < ?"
+        params.append(before_id)
+
+    query += " ORDER BY id DESC LIMIT ?;"
+    params.append(limit)
+
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        return [dict(row) for row in reversed(rows)]
+
+
 def get_user_messages(
     chat_id: int,
     username: Optional[str] = None,
@@ -161,55 +209,29 @@ def get_user_messages(
     limit: int = 10,
     db_path: Optional[str] = None,
 ) -> list[str]:
-    """Retrieves recent non-command messages from a user in a specific chat."""
-    path = db_path or get_db_path()
-    clean_username = username.lstrip("@").lower() if username else None
+    """Retrieves recent non-command message text strings from a specific user."""
+    if not username and user_id is None:
+        return []
+    messages = get_chat_messages(
+        chat_id=chat_id, username=username, user_id=user_id, limit=limit, db_path=db_path
+    )
+    return [m["text"] for m in messages]
 
-    with get_connection(path) as conn:
-        cursor = conn.cursor()
-        # Query messages matching either username or user_id, excluding slash commands
-        if clean_username and user_id:
-            cursor.execute(
-                """
-                SELECT text FROM messages
-                WHERE chat_id = ?
-                  AND (LOWER(username) = ? OR user_id = ?)
-                  AND text NOT LIKE '/%'
-                ORDER BY id DESC
-                LIMIT ?;
-                """,
-                (chat_id, clean_username, user_id, limit),
-            )
-        elif clean_username:
-            cursor.execute(
-                """
-                SELECT text FROM messages
-                WHERE chat_id = ?
-                  AND LOWER(username) = ?
-                  AND text NOT LIKE '/%'
-                ORDER BY id DESC
-                LIMIT ?;
-                """,
-                (chat_id, clean_username, limit),
-            )
-        elif user_id:
-            cursor.execute(
-                """
-                SELECT text FROM messages
-                WHERE chat_id = ?
-                  AND user_id = ?
-                  AND text NOT LIKE '/%'
-                ORDER BY id DESC
-                LIMIT ?;
-                """,
-                (chat_id, user_id, limit),
-            )
-        else:
-            return []
 
-        rows = cursor.fetchall()
-        # Return chronologically (oldest first) so the AI reads the conversation naturally
-        return [row["text"] for row in reversed(rows)]
+async def async_get_chat_messages(
+    chat_id: int,
+    username: Optional[str] = None,
+    user_id: Optional[int] = None,
+    limit: int = 10,
+    before_id: Optional[int] = None,
+    db_path: Optional[str] = None,
+) -> list[dict]:
+    """Non-blocking async wrapper to retrieve chat messages."""
+    return await asyncio.to_thread(
+        get_chat_messages, chat_id, username, user_id, limit, before_id, db_path
+    )
+
+
 
 
 async def async_get_user_messages(
@@ -608,6 +630,118 @@ async def async_get_user_persona(user_id: int, db_path: Optional[str] = None) ->
 async def async_set_user_persona(user_id: int, persona_key: str, db_path: Optional[str] = None) -> None:
     """Non-blocking async wrapper to save a user's selected persona."""
     await asyncio.to_thread(set_user_persona, user_id, persona_key, db_path)
+
+
+def is_reaction_enabled(chat_id: int, db_path: Optional[str] = None) -> bool:
+    """Checks whether automatic message reactions are enabled for a specific chat."""
+    path = db_path or get_db_path()
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT enabled FROM chat_reaction_settings WHERE chat_id = ?;", (chat_id,))
+        row = cursor.fetchone()
+        return bool(row and row["enabled"] == 1)
+
+
+def set_reaction_enabled(chat_id: int, enabled: bool, db_path: Optional[str] = None) -> None:
+    """Updates or inserts the reaction enabled status for a chat."""
+    path = db_path or get_db_path()
+    now = datetime.now(timezone.utc).isoformat()
+    val = 1 if enabled else 0
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO chat_reaction_settings (chat_id, enabled, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET enabled = excluded.enabled, updated_at = excluded.updated_at;
+            """,
+            (chat_id, val, now),
+        )
+        conn.commit()
+
+
+def toggle_reaction_enabled(chat_id: int, db_path: Optional[str] = None) -> bool:
+    """Flips the reaction enabled state for a chat and returns the new state."""
+    current = is_reaction_enabled(chat_id, db_path)
+    new_state = not current
+    set_reaction_enabled(chat_id, new_state, db_path)
+    return new_state
+
+
+async def async_is_reaction_enabled(chat_id: int, db_path: Optional[str] = None) -> bool:
+    """Non-blocking async wrapper to check if reactions are enabled."""
+    return await asyncio.to_thread(is_reaction_enabled, chat_id, db_path)
+
+
+async def async_set_reaction_enabled(chat_id: int, enabled: bool, db_path: Optional[str] = None) -> None:
+    """Non-blocking async wrapper to update reaction status."""
+    await asyncio.to_thread(set_reaction_enabled, chat_id, enabled, db_path)
+
+
+async def async_toggle_reaction_enabled(chat_id: int, db_path: Optional[str] = None) -> bool:
+    """Non-blocking async wrapper to flip reaction status."""
+    return await asyncio.to_thread(toggle_reaction_enabled, chat_id, db_path)
+
+
+def get_recent_chat_messages(
+    chat_id: int,
+    limit: int = 5,
+    before_id: Optional[int] = None,
+    db_path: Optional[str] = None,
+) -> list[dict]:
+    """Retrieves recent non-command messages from all users in a chat in chronological order."""
+    return get_chat_messages(
+        chat_id=chat_id, limit=limit, before_id=before_id, db_path=db_path
+    )
+
+
+
+async def async_get_recent_chat_messages(
+    chat_id: int,
+    limit: int = 5,
+    before_id: Optional[int] = None,
+    db_path: Optional[str] = None,
+) -> list[dict]:
+    """Non-blocking async wrapper to fetch recent chat messages."""
+    return await asyncio.to_thread(get_recent_chat_messages, chat_id, limit, before_id, db_path)
+
+
+def get_effective_persona(
+    chat_id: int,
+    user_id: Optional[int] = None,
+    db_path: Optional[str] = None,
+) -> str:
+    """Resolves persona with precedence: chat persona -> sender persona -> 'standard'."""
+    path = db_path or get_db_path()
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        # 1. Check if chat has a designated persona
+        cursor.execute("SELECT persona_key FROM user_personas WHERE user_id = ?;", (chat_id,))
+        chat_row = cursor.fetchone()
+        if chat_row:
+            return chat_row["persona_key"]
+
+        # 2. Check if the user has a personal persona
+        if user_id is not None:
+            cursor.execute("SELECT persona_key FROM user_personas WHERE user_id = ?;", (user_id,))
+            user_row = cursor.fetchone()
+            if user_row:
+                return user_row["persona_key"]
+
+    return "standard"
+
+
+async def async_get_effective_persona(
+    chat_id: int,
+    user_id: Optional[int] = None,
+    db_path: Optional[str] = None,
+) -> str:
+    """Non-blocking async wrapper to resolve active persona."""
+    return await asyncio.to_thread(get_effective_persona, chat_id, user_id, db_path)
+
+
+
+
 
 
 

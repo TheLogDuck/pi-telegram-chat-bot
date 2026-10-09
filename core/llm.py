@@ -9,6 +9,17 @@ from core.personas import get_persona
 
 logger = setup_logger("llm")
 
+# Whitelist of standard Telegram reaction emojis supported across free chats
+ALLOWED_TELEGRAM_REACTIONS: frozenset[str] = frozenset({
+    "👍", "👎", "❤️", "🔥", "🥰", "👏", "😁", "🤔", "🤯", "😱",
+    "🤬", "😢", "🎉", "🤩", "🤮", "💩", "🙏", "👌", "🕊", "🤡",
+    "🥱", "🥴", "😍", "🐳", "❤️‍🔥", "🌚", "🌭", "💯", "🤣", "⚡",
+    "🍌", "🏆", "💔", "🤨", "😐", "🍓", "🍾", "🍿", "☕", "🍸",
+    "🍩", "👻", "👨‍💻", "👀", "🎃", "🙈", "😇", "😨", "🤝", "✍",
+    "🤗", "🫡", "🎅", "🎄", "☃", "💅", "🤪", "🗿", "🆒", "💘",
+    "🙉", "🦄", "😘", "💊", "🙊", "😎", "👾", "🤷‍♂️", "🤷", "🤷‍♀️", "😡",
+})
+
 # Permissive safety settings for 18+ cynical/dark humor persona to prevent API false-positive blocks
 CYNIC_SAFETY_SETTINGS = [
     types.SafetySetting(
@@ -56,6 +67,25 @@ def get_candidate_image_models() -> list[str]:
     if configured:
         return [configured] + [m for m in IMAGE_MODEL_ROTATION_CANDIDATES if m != configured]
     return list(IMAGE_MODEL_ROTATION_CANDIDATES)
+
+
+# Reaction models: strictly prioritized by cheapest token cost and low latency
+DEFAULT_REACTION_MODEL = "gemini-3.5-flash-lite"
+REACTION_MODEL_ROTATION_CANDIDATES = [
+    "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-3.8-flash",
+]
+
+
+
+def get_candidate_reaction_models() -> list[str]:
+    """Returns ordered list of lightweight models for reaction evaluation."""
+    configured = os.getenv("GEMINI_REACTION_MODEL")
+    if configured:
+        return [configured] + [m for m in REACTION_MODEL_ROTATION_CANDIDATES if m != configured]
+    return list(REACTION_MODEL_ROTATION_CANDIDATES)
+
 
 
 # Track whether Google Search tool quota is available on this API key.
@@ -475,4 +505,93 @@ async def generate_meme_image(
 
     logger.error("All Nano Banana image models exhausted.")
     return None, None, IMAGE_ERROR_MESSAGE, None
+
+
+def _build_reaction_prompt(
+    current_message: str,
+    chat_history: list[dict],
+    author_name: Optional[str] = None,
+) -> str:
+    """Formats the conversational context and current message for the reaction decision."""
+    history_lines = []
+    for item in chat_history:
+        uname = item.get("username") or "User"
+        txt = item.get("text", "").strip()
+        if txt:
+            history_lines.append(f"- {uname}: {txt}")
+
+    context_block = "\n".join(history_lines) if history_lines else "(No previous messages)"
+    author_label = author_name or "User"
+    return (
+        f"Context of recent chat messages:\n{context_block}\n\n"
+        f"New message from {author_label}:\n\"{current_message.strip()}\"\n\n"
+        "Decide: Should you react with an emoji, or NONE?"
+    )
+
+
+def _build_reaction_system_instruction(persona_key: Optional[str]) -> str:
+    """Builds a system prompt instructing the model to pick ONE emoji or NONE."""
+    persona = get_persona(persona_key)
+    return (
+        f"You are a Telegram bot with the following persona: {persona.name} ({persona.description}).\n"
+        "Your task is to analyze the recent conversation and determine whether to react to the new message.\n"
+        "RULES:\n"
+        "1. Respond with EXACTLY ONE emoji from standard Telegram reactions, OR the word NONE.\n"
+        "2. Only react if the message strongly warrants an emotional reaction fitting your persona. "
+        "For ordinary chatter, greetings, or neutral statements, respond with NONE.\n"
+        "3. Output ONLY the single emoji or NONE. No explanations, words, markdown, or punctuation."
+    )
+
+
+async def decide_message_reaction(
+    current_message: str,
+    chat_history: list[dict],
+    persona_key: Optional[str] = None,
+    author_name: Optional[str] = None,
+    client: Optional[genai.Client] = None,
+    chat_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+) -> tuple[Optional[str], Optional[str]]:
+    """Evaluates whether to set an emoji reaction on a message based on context and persona."""
+    if not current_message or not current_message.strip():
+        return None, None
+
+    active_persona = get_persona(persona_key)
+    prompt = _build_reaction_prompt(current_message, chat_history, author_name)
+    sys_instruction = _build_reaction_system_instruction(persona_key)
+    safety_settings = CYNIC_SAFETY_SETTINGS if active_persona.key == "cynic" else None
+    llm_client = client or get_gemini_client()
+    config = types.GenerateContentConfig(
+        system_instruction=sys_instruction,
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        safety_settings=safety_settings,
+    )
+
+    for model_name in get_candidate_reaction_models():
+        try:
+            response = await llm_client.aio.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=config,
+            )
+            await record_usage(response, model_name, "reaction", chat_id, user_id)
+            raw = (response.text or "").strip().strip("\"'").strip()
+            if not raw or raw.upper() == "NONE":
+                return None, model_name
+            # Strictly validate that the emoji is supported by Telegram
+            if raw in ALLOWED_TELEGRAM_REACTIONS:
+                return raw, model_name
+            logger.info(f"Model {model_name} suggested invalid or unwhitelisted reaction: {raw}")
+            return None, model_name
+        except Exception as exc:
+            logger.warning(f"Reaction evaluation with {model_name} failed: {exc}. Trying next...")
+            continue
+
+    logger.error("All candidate reaction models exhausted.")
+    return None, None
+
+
+
+
+
 
