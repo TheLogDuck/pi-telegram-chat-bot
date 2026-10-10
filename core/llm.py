@@ -120,7 +120,7 @@ async def record_usage(
     ) / 1_000_000.0
 
     try:
-        from core.db import async_save_token_usage
+        from core.database.telemetry import async_save_token_usage
 
         await async_save_token_usage(
             model=model_name,

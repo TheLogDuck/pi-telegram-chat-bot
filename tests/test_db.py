@@ -1,6 +1,7 @@
 # Unit tests for database initialization and message logging operations.
 import asyncio
-from core.db import async_save_message, get_connection, init_db, save_message
+from core.database.connection import get_connection, init_db
+from core.database.messages import async_save_message, save_message
 
 def test_init_db_and_save_message(tmp_path):
     """Verifies that init_db creates schema and messages are saved accurately."""
@@ -46,7 +47,7 @@ def test_init_db_and_save_message(tmp_path):
 
 def test_get_user_messages_filtering_and_order(tmp_path):
     """Verifies that get_user_messages retrieves recent non-command messages."""
-    from core.db import async_get_user_messages, get_user_messages
+    from core.database.messages import async_get_user_messages, get_user_messages
 
     test_db = str(tmp_path / "test_memory.db")
     init_db(test_db)
@@ -77,7 +78,7 @@ def test_get_user_messages_filtering_and_order(tmp_path):
 
 def test_save_and_get_token_usage_stats(tmp_path):
     """Verifies that token usage records are saved and aggregated accurately."""
-    from core.db import async_save_token_usage, get_token_usage_stats, save_token_usage
+    from core.database.telemetry import async_save_token_usage, get_token_usage_stats, save_token_usage
 
     test_db = str(tmp_path / "test_memory.db")
     init_db(test_db)
@@ -129,7 +130,8 @@ def test_save_and_get_token_usage_stats(tmp_path):
 def test_cleanup_old_messages(tmp_path):
     """Verifies that cleanup_old_messages deletes rows older than retention_days."""
     from datetime import datetime, timedelta, timezone
-    from core.db import cleanup_old_messages, get_connection, init_db, save_message
+    from core.database.connection import get_connection, init_db
+    from core.database.messages import cleanup_old_messages, save_message
 
     test_db = str(tmp_path / "test_memory.db")
     init_db(test_db)
@@ -157,7 +159,8 @@ def test_cleanup_old_messages(tmp_path):
 def test_async_cleanup_old_messages(tmp_path):
     """Verifies non-blocking async wrapper executes cleanup cleanly."""
     from datetime import datetime, timedelta, timezone
-    from core.db import async_cleanup_old_messages, init_db, save_message
+    from core.database.connection import init_db
+    from core.database.messages import async_cleanup_old_messages, save_message
 
     test_db = str(tmp_path / "test_memory.db")
     init_db(test_db)
@@ -173,14 +176,14 @@ def test_async_cleanup_old_messages(tmp_path):
 
 def test_access_grants_operations(tmp_path):
     """Verifies access control whitelist queries, request creation, and updates."""
-    from core.db import (
+    from core.database.access import (
         async_get_all_access_grants,
         async_get_or_create_access_request,
         async_is_entity_approved,
         async_set_access_status,
-        init_db,
         is_entity_approved,
     )
+    from core.database.connection import init_db
 
     test_db = str(tmp_path / "test_memory.db")
     init_db(test_db)

@@ -5,9 +5,9 @@ from telegram import ReactionTypeEmoji, Update
 from telegram.constants import ChatType, ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
-from core.db import (
-    async_get_effective_persona,
-    async_get_recent_chat_messages,
+from core.database.messages import async_get_recent_chat_messages
+from core.database.personas import async_get_effective_persona
+from core.database.reactions import (
     async_is_reaction_enabled,
     async_toggle_reaction_enabled,
 )

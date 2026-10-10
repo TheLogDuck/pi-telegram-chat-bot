@@ -227,7 +227,7 @@ def test_record_usage_calculates_cost() -> None:
     mock_usage.total_token_count = 1500
     mock_response.usage_metadata = mock_usage
 
-    with patch("core.db.async_save_token_usage", new_callable=AsyncMock) as mock_save:
+    with patch("core.database.telemetry.async_save_token_usage", new_callable=AsyncMock) as mock_save:
         asyncio.run(
             record_usage(
                 response=mock_response,

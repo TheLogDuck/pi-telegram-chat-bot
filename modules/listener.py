@@ -1,7 +1,7 @@
 # Listener module to passively record incoming text messages into the database.
 from telegram import Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
-from core.db import async_save_message
+from core.database.messages import async_save_message
 from core.logger import setup_logger
 
 logger = setup_logger("listener")

@@ -4,7 +4,8 @@ import os
 import sys
 from dotenv import load_dotenv
 from telegram.ext import Application, ApplicationBuilder
-from core.db import async_cleanup_old_messages, init_db
+from core.database.connection import init_db
+from core.database.messages import async_cleanup_old_messages
 from core.error_handler import global_error_handler
 from core.logger import setup_logger
 from modules.analytics import register_analytics

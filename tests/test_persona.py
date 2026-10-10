@@ -6,11 +6,11 @@ import pytest
 from telegram import Update
 from telegram.constants import ParseMode
 
-from core.db import (
+from core.database.connection import init_db
+from core.database.personas import (
     async_get_user_persona,
     async_set_user_persona,
     get_user_persona,
-    init_db,
     set_user_persona,
 )
 from core.llm import generate_meme_image, generate_response, generate_roast

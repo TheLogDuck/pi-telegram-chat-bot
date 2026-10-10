@@ -3,7 +3,7 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
-from core.db import async_get_user_persona, async_set_user_persona
+from core.database.personas import async_get_user_persona, async_set_user_persona
 from core.logger import setup_logger
 from core.personas import PERSONA_REGISTRY, get_persona
 

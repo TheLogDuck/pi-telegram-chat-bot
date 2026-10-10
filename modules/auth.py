@@ -13,7 +13,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-from core.db import (
+from core.database.access import (
     async_get_all_access_grants,
     async_get_or_create_access_request,
     async_is_entity_approved,
@@ -26,6 +26,14 @@ logger = setup_logger("auth")
 
 # In-memory cache of approved (entity_type, entity_id) tuples for sub-microsecond lookups
 _APPROVED_CACHE: Set[Tuple[str, int]] = set()
+
+# Commands that the administrator can execute in group chats without triggering access denial
+ADMIN_BYPASS_COMMANDS: Tuple[str, ...] = (
+    "/approve",
+    "/reject",
+    "/access",
+    "/switch_reaction",
+)
 
 
 def get_admin_id() -> Optional[int]:
@@ -125,8 +133,8 @@ async def auth_gatekeeper(
         entity_id = chat.id
         entity_title = chat.title or f"Group {chat.id}"
 
-        # Allow admin management commands (/approve, /reject, /access, /switch_reaction) to pass through
-        if is_admin(user.id) and message.text and message.text.strip().startswith(("/approve", "/reject", "/access", "/switch_reaction")):
+        # Allow admin management commands to pass through without access restriction
+        if is_admin(user.id) and message.text and message.text.strip().startswith(ADMIN_BYPASS_COMMANDS):
             return
 
 

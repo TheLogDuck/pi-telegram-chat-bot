@@ -6,7 +6,8 @@ import pytest
 from telegram import CallbackQuery, Chat, Message, Update, User
 from telegram.constants import ChatType, ParseMode
 from telegram.ext import ApplicationHandlerStop
-from core.db import async_set_access_status, init_db
+from core.database.access import async_set_access_status
+from core.database.connection import init_db
 from modules.auth import (
     _APPROVED_CACHE,
     access_list_command,
@@ -98,6 +99,19 @@ def test_admin_bypasses_gatekeeper(monkeypatch, tmp_path):
     asyncio.run(auth_gatekeeper(update, context))
     context.bot.send_message.assert_not_called()
     update.effective_message.reply_text.assert_not_called()
+
+
+def test_admin_commands_bypass_in_unauthorized_group(monkeypatch):
+    """Verifies admin commands in unapproved groups pass without gatekeeper interruption."""
+    monkeypatch.setenv("ADMIN_CHAT_ID", "777")
+    context = make_context()
+
+    for cmd in ("/approve 123", "/reject 123", "/access", "/switch_reaction"):
+        update = make_update(ChatType.GROUP, cmd, user_id=777, chat_id=-9999)
+        asyncio.run(auth_gatekeeper(update, context))
+        context.bot.send_message.assert_not_called()
+        update.effective_message.reply_text.assert_not_called()
+
 
 
 def test_private_unauthorized_user_creates_request(monkeypatch, tmp_path):

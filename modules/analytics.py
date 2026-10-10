@@ -4,7 +4,7 @@ import os
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
-from core.db import async_get_token_usage_stats
+from core.database.telemetry import async_get_token_usage_stats
 from core.logger import setup_logger
 
 logger = setup_logger("analytics")

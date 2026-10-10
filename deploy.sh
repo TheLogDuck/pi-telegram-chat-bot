@@ -42,7 +42,7 @@ pip install --no-input -r requirements.txt
 
 # Step 5: Apply SQLite schema initialization / migrations
 log_info "Applying SQLite database migrations..."
-python -c "from core.db import init_db; init_db()"
+python -c "from core.database import init_db; init_db()"
 
 # Step 6: Run test suite; halts script via trap if any test fails
 log_info "Running unit tests with pytest..."

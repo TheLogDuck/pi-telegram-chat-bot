@@ -3,20 +3,23 @@
 import asyncio
 import pytest
 
-from core.db import (
+from core.database.connection import init_db
+from core.database.messages import (
     async_get_recent_chat_messages,
+    get_chat_messages,
+    get_recent_chat_messages,
+    save_message,
+)
+from core.database.personas import (
+    get_effective_persona,
+    set_user_persona,
+)
+from core.database.reactions import (
     async_is_reaction_enabled,
     async_set_reaction_enabled,
     async_toggle_reaction_enabled,
-    get_effective_persona,
-    get_chat_messages,
-    get_recent_chat_messages,
-    init_db,
-
     is_reaction_enabled,
-    save_message,
     set_reaction_enabled,
-    set_user_persona,
     toggle_reaction_enabled,
 )
 

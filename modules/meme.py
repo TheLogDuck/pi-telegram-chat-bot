@@ -5,7 +5,7 @@ from typing import Optional
 from telegram import Update
 from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
-from core.db import async_get_user_persona
+from core.database.personas import async_get_user_persona
 from core.llm import generate_meme_image
 from core.logger import setup_logger
 

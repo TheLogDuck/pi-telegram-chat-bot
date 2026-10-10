@@ -251,7 +251,7 @@ bash deploy.sh
 1. **Repository Synchronization:** Pulls incoming commits from `origin/main`.
 2. **Virtual Environment Isolation:** Activates `/home/admin/pi-telegram-chat-bot/venv`.
 3. **Dependency Sync:** Installs updated pinned packages via `pip install --no-input -r requirements.txt`.
-4. **Database Migration:** Executes idempotent schema initialization (`python -c "from core.db import init_db; init_db()"`).
+4. **Database Migration:** Executes idempotent schema initialization (`python -c "from core.database import init_db; init_db()"`).
 5. **Quality Gatekeeper:** Runs `pytest`. If any unit test fails, the bash `ERR` trap catches the exit code and aborts the entire execution before touching the running service.
 6. **Graceful Reload:** If and only if all tests pass, the script executes `sudo systemctl restart telegram-bot.service`.
 
