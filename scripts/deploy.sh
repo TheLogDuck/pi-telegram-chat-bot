@@ -1,6 +1,7 @@
 #!/bin/bash
 # Application deployment script executed after git pull completes.
 # Handles virtual environment, dependencies, database migrations, testing, and service reload.
+# Dynamically detects whether it is running in production or test environment.
 
 set -euo pipefail
 
@@ -19,14 +20,16 @@ on_error() {
     local line_no=$1
     local cmd=$2
     log_error "Deployment failed at line $line_no (command: '$cmd', exit code: $exit_code)"
-    log_error "Aborting deployment. telegram-bot.service was NOT restarted."
+    log_error "Aborting deployment. Service was NOT restarted."
 }
 trap 'on_error $LINENO "$BASH_COMMAND"' ERR
 
-log_info "Starting application deployment..."
+# Step 1: Navigate to repository root dynamically
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
 
-# Step 1: Navigate to repository root
-cd ~/pi-telegram-chat-bot
+log_info "Starting application deployment in: $PROJECT_ROOT"
 
 # Step 2: Activate isolated Python virtual environment
 log_info "Activating virtual environment..."
@@ -44,8 +47,12 @@ python -c "from core.database import init_db; init_db()"
 log_info "Running unit tests with pytest..."
 pytest
 
-# Step 6: Restart the systemd service (only reached if all tests pass)
-log_info "All tests passed. Restarting telegram-bot.service..."
-sudo systemctl restart telegram-bot.service
+# Step 6: Restart systemd service only if running in production
+if [[ "$PROJECT_ROOT" == *"-test"* ]]; then
+    log_info "Test environment detected ($PROJECT_ROOT). Skipping systemctl service restart (run manually in tmux/terminal)."
+else
+    log_info "Production environment detected ($PROJECT_ROOT). Restarting telegram-bot.service..."
+    sudo systemctl restart telegram-bot.service
+fi
 
 log_info "Deployment completed successfully."
