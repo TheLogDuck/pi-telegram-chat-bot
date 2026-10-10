@@ -1,5 +1,5 @@
 # User persona preference storage and resolution hierarchy.
-# Manages user-selected personas ('standard', 'cynic', 'meme_lord') in SQLite.
+# Manages user-selected personas ('standard', 'meme_lord') in SQLite.
 import asyncio
 from datetime import datetime, timezone
 from typing import Optional

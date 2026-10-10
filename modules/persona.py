@@ -46,11 +46,9 @@ async def persona_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Check if a specific persona key was provided directly as an argument
     if context.args:
         requested = context.args[0].strip().lower()
-        # Allow intuitive shortcuts: 'cynic', 'toxic', 'standard', 'default'
+        # Allow intuitive shortcuts: 'standard', 'default', 'meme_lord'
         target_key = None
-        if requested in ("cynic", "toxic", "цинік", "токсик"):
-            target_key = "cynic"
-        elif requested in ("standard", "default", "стандартний", "дефолт"):
+        if requested in ("standard", "default", "стандартний", "дефолт"):
             target_key = "standard"
         elif requested in ("meme_lord", "memelord", "meme", "мемлорд", "мем_лорд", "мем"):
             target_key = "meme_lord"

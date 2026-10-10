@@ -15,7 +15,6 @@ from core.database.personas import (
 )
 from core.llm import generate_meme_image, generate_response, generate_roast
 from core.personas import (
-    CYNIC_PERSONA,
     STANDARD_PERSONA,
     get_persona,
 )
@@ -32,8 +31,8 @@ from modules.persona import (
 def test_get_persona_fallbacks() -> None:
     """Verifies that get_persona resolves valid keys and safely falls back to standard."""
     assert get_persona("standard").key == "standard"
-    assert get_persona("cynic").key == "cynic"
     assert get_persona("meme_lord").key == "meme_lord"
+    assert get_persona("cynic").key == "standard"
     assert get_persona(None).key == "standard"
     assert get_persona("nonexistent_alien_persona").key == "standard"
 
@@ -47,34 +46,30 @@ def test_db_user_persona_isolation(tmp_path) -> None:
     assert get_user_persona(1001, db_path=db_file) == "standard"
     assert get_user_persona(1002, db_path=db_file) == "standard"
 
-    # Set user 1001 to cynic
-    set_user_persona(1001, "cynic", db_path=db_file)
-    assert get_user_persona(1001, db_path=db_file) == "cynic"
+    # Set user 1001 to meme_lord
+    set_user_persona(1001, "meme_lord", db_path=db_file)
+    assert get_user_persona(1001, db_path=db_file) == "meme_lord"
     # User 1002 remains unaffected
     assert get_user_persona(1002, db_path=db_file) == "standard"
 
     # Async getters and setters verification
-    asyncio.run(async_set_user_persona(1002, "cynic", db_path=db_file))
-    assert asyncio.run(async_get_user_persona(1002, db_path=db_file)) == "cynic"
+    asyncio.run(async_set_user_persona(1002, "meme_lord", db_path=db_file))
+    assert asyncio.run(async_get_user_persona(1002, db_path=db_file)) == "meme_lord"
 
 
 def test_build_persona_keyboard() -> None:
     """Verifies keyboard buttons format and marks active persona."""
     markup = build_persona_keyboard("standard")
     buttons = [row[0] for row in markup.inline_keyboard]
-    assert len(buttons) == 3
+    assert len(buttons) == 2
 
     # Standard should be marked as active
     assert "[Обрано]" in buttons[0].text
     assert buttons[0].callback_data == f"{CALLBACK_PREFIX}standard"
 
-    # Cynic should not be marked active
-    assert "[Обрано]" not in buttons[1].text
-    assert buttons[1].callback_data == f"{CALLBACK_PREFIX}cynic"
-
     # Meme Lord should not be marked active
-    assert "[Обрано]" not in buttons[2].text
-    assert buttons[2].callback_data == f"{CALLBACK_PREFIX}meme_lord"
+    assert "[Обрано]" not in buttons[1].text
+    assert buttons[1].callback_data == f"{CALLBACK_PREFIX}meme_lord"
 
 
 def test_persona_command_no_args_displays_keyboard(tmp_path) -> None:
@@ -103,7 +98,7 @@ def test_persona_command_no_args_displays_keyboard(tmp_path) -> None:
 
 
 def test_persona_command_with_arg_shortcut() -> None:
-    """Verifies /persona cynic sets the persona directly without showing buttons."""
+    """Verifies /persona standard sets the persona directly without showing buttons."""
     update = MagicMock(spec=Update)
     message = MagicMock()
     message.reply_text = AsyncMock()
@@ -111,23 +106,23 @@ def test_persona_command_with_arg_shortcut() -> None:
     update.effective_user.id = 5002
 
     context = MagicMock()
-    context.args = ["cynic"]
+    context.args = ["standard"]
 
     with patch("modules.persona.async_set_user_persona", new_callable=AsyncMock) as mock_set:
         asyncio.run(persona_command(update, context))
 
-        mock_set.assert_awaited_once_with(5002, "cynic")
+        mock_set.assert_awaited_once_with(5002, "standard")
         message.reply_text.assert_awaited_once()
         text = message.reply_text.await_args.args[0]
         assert "Стиль успішно змінено:" in text
-        assert "Токсичний цинік" in text
+        assert "Стандартний" in text
 
 
 def test_persona_callback_query_updates_choice() -> None:
     """Verifies clicking an inline button updates the persona and edits the UI."""
     update = MagicMock(spec=Update)
     query = MagicMock()
-    query.data = f"{CALLBACK_PREFIX}cynic"
+    query.data = f"{CALLBACK_PREFIX}meme_lord"
     query.from_user.id = 7001
     query.answer = AsyncMock()
     query.edit_message_text = AsyncMock()
@@ -139,78 +134,12 @@ def test_persona_callback_query_updates_choice() -> None:
     with patch("modules.persona.async_set_user_persona", new_callable=AsyncMock) as mock_set:
         asyncio.run(persona_callback_query(update, context))
 
-        mock_set.assert_awaited_once_with(7001, "cynic")
-        query.answer.assert_awaited_once_with("Обрано: Токсичний цинік (18+)")
+        mock_set.assert_awaited_once_with(7001, "meme_lord")
+        query.answer.assert_awaited_once_with("Обрано: Мем-лорд")
         query.edit_message_text.assert_awaited_once()
         edit_kwargs = query.edit_message_text.await_args.kwargs
-        assert "Токсичний цинік (18+)" in edit_kwargs["text"]
+        assert "Мем-лорд" in edit_kwargs["text"]
         assert edit_kwargs["reply_markup"] is not None
-
-
-def test_llm_generate_response_with_cynic_persona() -> None:
-    """Verifies that generate_response applies cynic persona instruction and safety settings."""
-    mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.text = "Відповідь токсичного бота."
-    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
-
-    result, model = asyncio.run(
-        generate_response("Привіт", persona_key="cynic", client=mock_client)
-    )
-
-    assert result == "Відповідь токсичного бота."
-    call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
-    config = call_kwargs["config"]
-    assert config.system_instruction == CYNIC_PERSONA.chat_system_instruction
-    assert config.safety_settings is not None
-    assert len(config.safety_settings) == 4
-
-
-def test_llm_generate_roast_with_cynic_persona() -> None:
-    """Verifies that generate_roast applies savage roasting prompt and safety settings."""
-    mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.text = "Нищівний роаст."
-    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
-
-    result, model = asyncio.run(
-        generate_roast(
-            target_name="victim_user",
-            context_messages=["я пишу на php"],
-            persona_key="cynic",
-            client=mock_client,
-        )
-    )
-
-    assert result == "Нищівний роаст."
-    call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
-    config = call_kwargs["config"]
-    assert config.system_instruction == CYNIC_PERSONA.roast_system_instruction
-    assert config.safety_settings is not None
-    assert "нецензурний роаст" in call_kwargs["contents"]
-
-
-def test_llm_generate_meme_with_cynic_persona() -> None:
-    """Verifies that generate_meme_image applies dark humor prompt template and safety settings."""
-    mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_candidate = MagicMock()
-    mock_part = MagicMock()
-    mock_part.inline_data.data = b"cynic_meme_bytes"
-    mock_part.inline_data.mime_type = "image/png"
-    mock_candidate.content.parts = [mock_part]
-    mock_response.candidates = [mock_candidate]
-    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
-
-    data, mime, err, model = asyncio.run(
-        generate_meme_image("сервер впав", persona_key="cynic", client=mock_client)
-    )
-
-    assert data == b"cynic_meme_bytes"
-    call_kwargs = mock_client.aio.models.generate_content.await_args.kwargs
-    assert "dark comedy satirical meme" in call_kwargs["contents"]
-    config = call_kwargs["config"]
-    assert config.safety_settings is not None
 
 
 def test_persona_intent_detection() -> None:

@@ -164,9 +164,9 @@ def test_get_effective_persona_resolution(tmp_path) -> None:
     # Default fallback when neither has a persona configured
     assert get_effective_persona(chat_id, user_id, db_path=db_file) == "standard"
 
-    # Configure user persona: effective persona becomes cynic
-    set_user_persona(user_id, "cynic", db_path=db_file)
-    assert get_effective_persona(chat_id, user_id, db_path=db_file) == "cynic"
+    # Configure user persona: effective persona becomes user_custom
+    set_user_persona(user_id, "user_custom", db_path=db_file)
+    assert get_effective_persona(chat_id, user_id, db_path=db_file) == "user_custom"
 
     # Configure chat persona: chat persona takes precedence over individual user persona
     set_user_persona(chat_id, "meme_lord", db_path=db_file)

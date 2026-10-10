@@ -102,7 +102,7 @@ def test_decide_reaction_invalid_or_wordy_output_filtered() -> None:
         decide_message_reaction(
             current_message="Random text",
             chat_history=[],
-            persona_key="cynic",
+            persona_key="meme_lord",
             client=mock_client,
         )
     )
