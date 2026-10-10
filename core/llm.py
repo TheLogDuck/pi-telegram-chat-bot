@@ -155,6 +155,42 @@ def get_gemini_client() -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
+async def execute_text_generation(
+    prompt: str,
+    config: types.GenerateContentConfig,
+    candidates: list[str],
+    feature: str,
+    client: Optional[genai.Client] = None,
+    chat_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+) -> tuple[Optional[str], Optional[str]]:
+    """Tries candidate models in order for text generation, recording token usage on success.
+
+    Centralizes the model rotation loop, API exception handling, and SQLite
+    usage telemetry in one place to keep individual feature functions lean.
+    """
+    llm_client = client or get_gemini_client()
+    for model_name in candidates:
+        try:
+            response = await llm_client.aio.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=config,
+            )
+            if response and getattr(response, "text", None):
+                text = response.text.strip()
+                if text:
+                    await record_usage(response, model_name, feature, chat_id, user_id)
+                    return text, model_name
+            logger.warning(f"Model {model_name} returned empty text for {feature}.")
+        except Exception as exc:
+            logger.warning(f"Model {model_name} failed for {feature}: {exc}. Rotating...")
+            continue
+
+    logger.error(f"All candidate models exhausted for feature: {feature}.")
+    return None, None
+
+
 async def generate_response(
     prompt: str,
     system_instruction: Optional[str] = None,
@@ -163,56 +199,26 @@ async def generate_response(
     user_id: Optional[int] = None,
     persona_key: Optional[str] = None,
 ) -> tuple[str, Optional[str]]:
-    """Asynchronously generates a text response from the Gemini model.
-
-    Args:
-        prompt: The user query or conversation context.
-        system_instruction: Optional override for the bot persona instruction.
-        client: Optional injected client (useful for unit testing and mocking).
-        chat_id: Optional Telegram chat identifier for telemetry attribution.
-        user_id: Optional Telegram user identifier for telemetry attribution.
-        persona_key: Optional persona identifier ('standard', 'meme_lord', etc.).
-
-    Returns:
-        A tuple of (response_text, model_name) where model_name is None on error.
-    """
+    """Asynchronously generates a text response from the Gemini model."""
     if not prompt or not prompt.strip():
         return "Будь ласка, вкажіть повідомлення або запитання.", None
 
-    # Resolve active persona instruction and corresponding safety filters
     active_persona = get_persona(persona_key)
-    sys_instruction = system_instruction or active_persona.chat_system_instruction
-
-    # Select model from environment or fallback to default
-    model_name = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
-    llm_client = client or get_gemini_client()
     config = types.GenerateContentConfig(
-        system_instruction=sys_instruction,
+        system_instruction=system_instruction or active_persona.chat_system_instruction,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
 
-    # Rotate through candidates to handle 404 deprecation or 429/503 spikes seamlessly
-    for model_name in get_candidate_models():
-        try:
-            response = await llm_client.aio.models.generate_content(
-                model=model_name,
-                contents=prompt.strip(),
-                config=config,
-            )
-            if response and response.text:
-                # Log token usage asynchronously to avoid blocking user response
-                await record_usage(response, model_name, "chat", chat_id, user_id)
-                return response.text.strip(), model_name
-            logger.warning(f"Model {model_name} returned empty text.")
-        except Exception as exc:
-            logger.warning(
-                f"Model {model_name} encountered an error: {exc}. "
-                "Rotating to next fallback model..."
-            )
-            continue
-
-    logger.error("All Gemini model candidates exhausted.")
-    return API_ERROR_MESSAGE, None
+    text, model = await execute_text_generation(
+        prompt=prompt.strip(),
+        config=config,
+        candidates=get_candidate_models(),
+        feature="chat",
+        client=client,
+        chat_id=chat_id,
+        user_id=user_id,
+    )
+    return (text, model) if text else (API_ERROR_MESSAGE, None)
 
 
 # System instruction specifically for grounding news briefings in Ukrainian
@@ -229,19 +235,7 @@ async def generate_news_briefing(
     chat_id: Optional[int] = None,
     user_id: Optional[int] = None,
 ) -> tuple[str, Optional[str]]:
-    """Asynchronously generates a news briefing grounded with Google Search.
-
-    Rotates through candidate models if rate limits or unavailable errors occur.
-
-    Args:
-        topic: Optional subject filter (e.g. 'технології', 'штучний інтелект').
-        client: Optional injected client for unit testing.
-        chat_id: Optional Telegram chat identifier for telemetry attribution.
-        user_id: Optional Telegram user identifier for telemetry attribution.
-
-    Returns:
-        A tuple of (news_text, model_name) where model_name is None on error.
-    """
+    """Asynchronously generates a news briefing grounded with Google Search."""
     if topic and topic.strip():
         prompt = (
             f"Підготуй стислий інформаційний дайджест останніх актуальних новин "
@@ -254,56 +248,44 @@ async def generate_news_briefing(
         )
 
     global _search_grounding_available
-    llm_client = client or get_gemini_client()
 
-    # Attempt Grounded Search with Google Search tool only if quota is available
+    # Attempt Grounded Search with Google Search tool if available
     if _search_grounding_available:
-        config = types.GenerateContentConfig(
+        grounded_config = types.GenerateContentConfig(
             system_instruction=NEWS_SYSTEM_INSTRUCTION,
             tools=[types.Tool(google_search=types.GoogleSearch())],
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
-        for model_name in get_candidate_models():
-            try:
-                response = await llm_client.aio.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                    config=config,
-                )
-                if response and response.text:
-                    await record_usage(response, model_name, "news", chat_id, user_id)
-                    return response.text.strip(), model_name
-                logger.warning(f"Model {model_name} returned empty text for news briefing.")
-            except Exception as exc:
-                exc_str = str(exc)
-                if "429" in exc_str or "RESOURCE_EXHAUSTED" in exc_str:
-                    logger.info("Search tool quota unavailable on Free Tier (429). Switching to standard AI synthesis.")
-                    _search_grounding_available = False
-                    break
-                logger.warning(f"Grounded search with model {model_name} failed: {exc}. Trying next candidate...")
-                continue
+        text, model = await execute_text_generation(
+            prompt=prompt,
+            config=grounded_config,
+            candidates=get_candidate_models(),
+            feature="news",
+            client=client,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+        if text:
+            return text, model
+        # Disable tool grounding on quota failure (e.g. Free Tier 429) and fall back
+        _search_grounding_available = False
+        logger.info("Search tool quota unavailable. Falling back to standard AI synthesis.")
 
-    # Fallback to standard model synthesis (fast, zero external tool quota requirement)
+    # Fallback to standard model synthesis (fast, zero external search tool dependency)
     standard_config = types.GenerateContentConfig(
         system_instruction=NEWS_SYSTEM_INSTRUCTION,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
-    for model_name in get_candidate_models():
-        try:
-            response = await llm_client.aio.models.generate_content(
-                model=model_name,
-                contents=prompt,
-                config=standard_config,
-            )
-            if response and response.text:
-                await record_usage(response, model_name, "news", chat_id, user_id)
-                return response.text.strip(), model_name
-        except Exception as exc:
-            logger.warning(f"Standard news generation with {model_name} failed: {exc}")
-            continue
-
-    logger.error("All candidate models failed during news briefing.")
-    return API_ERROR_MESSAGE, None
+    text, model = await execute_text_generation(
+        prompt=prompt,
+        config=standard_config,
+        candidates=get_candidate_models(),
+        feature="news",
+        client=client,
+        chat_id=chat_id,
+        user_id=user_id,
+    )
+    return (text, model) if text else (API_ERROR_MESSAGE, None)
 
 
 # System instruction for standup comedy roast persona in Ukrainian
@@ -317,6 +299,44 @@ ROAST_SYSTEM_INSTRUCTION = (
 )
 
 
+def _build_roast_prompt(
+    clean_target: str,
+    context_messages: Optional[list[str]],
+    is_meme_lord: bool,
+) -> str:
+    """Formats the prompt context for standup comedy or meme-lord roasts."""
+    quotes = "\n".join(f"- {msg}" for msg in context_messages) if context_messages else None
+
+    if is_meme_lord:
+        if quotes:
+            return (
+                f"Влаштуй дотепну, постіронічну просмажку користувача @{clean_target} у стилі інтернет-мемів.\n"
+                f"Ось кілька його останніх реплік у цьому чаті:\n{quotes}\n\n"
+                "Обіграй ці цитати через актуальні меми, жизу, базу, крінж або щитпостинг (1-3 абзаци). "
+                "Відповідай виключно українською мовою."
+            )
+        return (
+            f"Влаштуй дотепну, постіронічну просмажку користувача @{clean_target} у стилі інтернет-мемів.\n"
+            "Цей мембер поки що взагалі мовчить у чаті (мабуть, ловить крінж або боїться спалитися). "
+            "Пожартуй над цим у стилі щитпостингу та постиронії (1-2 абзаци). "
+            "Відповідай виключно українською мовою."
+        )
+
+    if quotes:
+        return (
+            f"Влаштуй дотепний дружній роаст користувача @{clean_target}.\n"
+            f"Ось кілька його останніх реплік у цьому чаті:\n{quotes}\n\n"
+            "Обіграй ці цитати або звички у короткій, смішній стендап-прожарці (1-3 абзаци). "
+            "Відповідай виключно українською мовою."
+        )
+    return (
+        f"Влаштуй дотепний дружній роаст користувача @{clean_target}.\n"
+        "Цей користувач поки що майже нічого не писав у цьому чаті (або майстерно ховається у засідці). "
+        "Пожартуй над цим у короткій стендап-прожарці (1-2 абзаци). "
+        "Відповідай виключно українською мовою."
+    )
+
+
 async def generate_roast(
     target_name: str,
     context_messages: Optional[list[str]] = None,
@@ -325,84 +345,46 @@ async def generate_roast(
     user_id: Optional[int] = None,
     persona_key: Optional[str] = None,
 ) -> tuple[str, Optional[str]]:
-    """Generates a witty or savage standup comedy roast of a user in Ukrainian.
-
-    Args:
-        target_name: The username or display name of the user being roasted.
-        context_messages: Optional recent messages sent by the user for context.
-        client: Optional injected Gemini client for unit testing.
-        chat_id: Optional Telegram chat identifier for telemetry attribution.
-        user_id: Optional Telegram user identifier for telemetry attribution.
-        persona_key: Optional persona key ('standard' or 'meme_lord').
-
-    Returns:
-        A tuple of (roast_text, model_name) where model_name is None on failure.
-    """
+    """Generates a witty standup comedy roast of a user in Ukrainian."""
     clean_target = target_name.lstrip("@").strip()
     active_persona = get_persona(persona_key)
+    prompt = _build_roast_prompt(
+        clean_target=clean_target,
+        context_messages=context_messages,
+        is_meme_lord=(active_persona.key == "meme_lord"),
+    )
 
-    if active_persona.key == "meme_lord":
-        if context_messages:
-            quotes = "\n".join(f"- {msg}" for msg in context_messages)
-            prompt = (
-                f"Влаштуй дотепну, постіронічну просмажку користувача @{clean_target} у стилі інтернет-мемів.\n"
-                f"Ось кілька його останніх реплік у цьому чаті:\n{quotes}\n\n"
-                "Обіграй ці цитати через актуальні меми, жизу, базу, крінж або щитпостинг (1-3 абзаци). "
-                "Відповідай виключно українською мовою."
-            )
-        else:
-            prompt = (
-                f"Влаштуй дотепну, постіронічну просмажку користувача @{clean_target} у стилі інтернет-мемів.\n"
-                "Цей мембер поки що взагалі мовчить у чаті (мабуть, ловить крінж або боїться спалитися). "
-                "Пожартуй над цим у стилі щитпостингу та постиронії (1-2 абзаци). "
-                "Відповідай виключно українською мовою."
-            )
-    else:
-        if context_messages:
-            quotes = "\n".join(f"- {msg}" for msg in context_messages)
-            prompt = (
-                f"Влаштуй дотепний дружній роаст користувача @{clean_target}.\n"
-                f"Ось кілька його останніх реплік у цьому чаті:\n{quotes}\n\n"
-                "Обіграй ці цитати або звички у короткій, смішній стендап-прожарці (1-3 абзаци). "
-                "Відповідай виключно українською мовою."
-            )
-        else:
-            prompt = (
-                f"Влаштуй дотепний дружній роаст користувача @{clean_target}.\n"
-                "Цей користувач поки що майже нічого не писав у цьому чаті (або майстерно ховається у засідці). "
-                "Пожартуй над цим у короткій стендап-прожарці (1-2 абзаци). "
-                "Відповідай виключно українською мовою."
-            )
-
-    llm_client = client or get_gemini_client()
     config = types.GenerateContentConfig(
         system_instruction=active_persona.roast_system_instruction,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
+    text, model = await execute_text_generation(
+        prompt=prompt,
+        config=config,
+        candidates=get_candidate_models(),
+        feature="roast",
+        client=client,
+        chat_id=chat_id,
+        user_id=user_id,
+    )
+    return (text, model) if text else (API_ERROR_MESSAGE, None)
 
-    for model_name in get_candidate_models():
-        try:
-            response = await llm_client.aio.models.generate_content(
-                model=model_name,
-                contents=prompt,
-                config=config,
-            )
-            if response and response.text:
-                await record_usage(response, model_name, "roast", chat_id, user_id)
-                return response.text.strip(), model_name
-            logger.warning(f"Model {model_name} returned empty roast text.")
-        except Exception as exc:
-            logger.warning(f"Roast generation with {model_name} failed: {exc}")
-            continue
-
-    logger.error("All candidate models failed during roast generation.")
-    return API_ERROR_MESSAGE, None
 
 
 IMAGE_ERROR_MESSAGE = (
     "Вибачте, не вдалося згенерувати зображення через штучний інтелект. "
     "Будь ласка, спробуйте ще раз пізніше або змініть опис."
 )
+
+
+def _extract_image_data(response: object) -> tuple[Optional[bytes], Optional[str]]:
+    """Extracts inline image binary data and mime-type from Gemini candidate parts."""
+    candidates = getattr(response, "candidates", None)
+    if candidates and candidates[0].content and candidates[0].content.parts:
+        for part in candidates[0].content.parts:
+            if part.inline_data and part.inline_data.data:
+                return part.inline_data.data, part.inline_data.mime_type
+    return None, None
 
 
 async def generate_meme_image(
@@ -412,24 +394,12 @@ async def generate_meme_image(
     user_id: Optional[int] = None,
     persona_key: Optional[str] = None,
 ) -> tuple[Optional[bytes], Optional[str], Optional[str], Optional[str]]:
-    """Generates an image/meme using Google's Nano Banana multimodal models.
-
-    Args:
-        prompt: User's visual prompt or concept description.
-        client: Optional injected Gemini client for testing.
-        chat_id: Optional Telegram chat identifier for telemetry.
-        user_id: Optional Telegram user identifier for telemetry.
-        persona_key: Optional persona identifier ('standard', 'meme_lord', etc.).
-
-    Returns:
-        A tuple of (image_bytes, mime_type, error_message, model_name).
-    """
+    """Generates an image/meme using Google's Nano Banana multimodal models."""
     if not prompt or not prompt.strip():
         return None, None, "Будь ласка, вкажіть опис для зображення.", None
 
     active_persona = get_persona(persona_key)
     full_prompt = active_persona.meme_prompt_template.format(prompt=prompt.strip())
-
     llm_client = client or get_gemini_client()
     config = types.GenerateContentConfig(
         response_modalities=["IMAGE"],
@@ -443,21 +413,13 @@ async def generate_meme_image(
                 contents=full_prompt,
                 config=config,
             )
-            # Find the binary image part in response candidates
-            if response and response.candidates:
-                candidate = response.candidates[0]
-                if candidate.content and candidate.content.parts:
-                    for part in candidate.content.parts:
-                        if part.inline_data and part.inline_data.data:
-                            # Record token consumption in SQLite for /stats
-                            await record_usage(response, model_name, "meme", chat_id, user_id)
-                            return part.inline_data.data, part.inline_data.mime_type, None, model_name
-
+            data, mime = _extract_image_data(response)
+            if data:
+                await record_usage(response, model_name, "meme", chat_id, user_id)
+                return data, mime, None, model_name
             logger.warning(f"Image model {model_name} returned no image parts.")
         except Exception as exc:
-            logger.warning(
-                f"Image generation with {model_name} failed: {exc}. Trying next candidate..."
-            )
+            logger.warning(f"Image generation with {model_name} failed: {exc}. Trying next candidate...")
             continue
 
     logger.error("All Nano Banana image models exhausted.")
@@ -513,14 +475,12 @@ async def decide_message_reaction(
     if not current_message or not current_message.strip():
         return None, None
 
-    active_persona = get_persona(persona_key)
     prompt = _build_reaction_prompt(current_message, chat_history, author_name)
-    sys_instruction = _build_reaction_system_instruction(persona_key)
-    llm_client = client or get_gemini_client()
     config = types.GenerateContentConfig(
-        system_instruction=sys_instruction,
+        system_instruction=_build_reaction_system_instruction(persona_key),
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
+    llm_client = client or get_gemini_client()
 
     for model_name in get_candidate_reaction_models():
         try:
@@ -533,7 +493,6 @@ async def decide_message_reaction(
             raw = (response.text or "").strip().strip("\"'").strip()
             if not raw or raw.upper() == "NONE":
                 return None, model_name
-            # Strictly validate that the emoji is supported by Telegram
             if raw in ALLOWED_TELEGRAM_REACTIONS:
                 return raw, model_name
             logger.info(f"Model {model_name} suggested invalid or unwhitelisted reaction: {raw}")
@@ -544,9 +503,3 @@ async def decide_message_reaction(
 
     logger.error("All candidate reaction models exhausted.")
     return None, None
-
-
-
-
-
-
