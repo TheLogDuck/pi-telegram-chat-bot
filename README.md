@@ -25,7 +25,7 @@ This project demonstrates the design and deployment of a resilient, full-stack e
 - **FinOps & Token Telemetry:** Real-time tracking of prompt tokens, completion tokens, call frequencies, and estimated USD expenditure logged into SQLite. Exposes live financial analytics via an owner-only `/stats` command.
 - **Low-Overhead Persistent Storage (SQLite WAL):** Local persistence utilizing Write-Ahead Logging (`PRAGMA journal_mode = WAL`) for concurrent read/write performance. Includes an automated non-blocking 24-hour background task that prunes chat records past the 30-day retention window.
 - **Strict Dorm Firewall Traversal:** Runs behind an isolated university campus network with inbound client isolation. All traffic operates over outbound HTTPS long-polling (`Application.run_polling()`). Remote administration is conducted securely via a private Tailscale Mesh VPN.
-- **Test-Gated Pull-Based CI/CD:** Production updates trigger a pull-based deployment script (`deploy.sh`) equipped with a bash `ERR` trap. Before reloading the systemd service, the entire test suite (78 unit tests with 100% offline mocking) must pass, guaranteeing zero-downtime regression prevention.
+- **Test-Gated Pull-Based CI/CD:** Production updates trigger a two-tier pull-based deployment pipeline (`scripts/update.sh` -> `scripts/deploy.sh`) equipped with a bash `ERR` trap. Before reloading the systemd service, the entire test suite (135 unit tests with 100% offline mocking) must pass, guaranteeing zero-downtime regression prevention.
 
 ---
 
@@ -49,10 +49,10 @@ flowchart TD
             CLEANUP["24h Background Pruning Task"]
         end
 
-        subgraph CICD ["Pull-Based CI/CD (deploy.sh)"]
+        subgraph CICD ["Pull-Based CI/CD (scripts/update.sh)"]
             GIT["Git Pull origin main"]
             MIGRATE["Schema Migrations"]
-            PYTEST["Pytest Gatekeeper (78 Tests)"]
+            PYTEST["Pytest Gatekeeper (135 Tests)"]
             RELOAD["systemctl restart telegram-bot.service"]
         end
     end
@@ -240,13 +240,17 @@ python main.py
 
 ## Automated Deployment & Production CI/CD
 
-Production runs as an isolated `systemd` service on the Raspberry Pi edge device. Deployments utilize a pull-based bash script that guarantees zero-downtime regression protection.
+Production runs as an isolated `systemd` service on the Raspberry Pi edge device. Deployments utilize a two-tier pull-based architecture (`scripts/update.sh` -> `scripts/deploy.sh`) that eliminates self-modification hazards and guarantees zero-downtime regression protection.
 
 ```bash
-bash deploy.sh
+# Pulls from Git and executes deployment sequence
+bash scripts/update.sh
+
+# Or run deployment sequence directly without pulling from Git
+bash scripts/deploy.sh
 ```
 
-### Deployment Pipeline Workflow (`deploy.sh`)
+### Deployment Pipeline Workflow (`scripts/update.sh` -> `scripts/deploy.sh`)
 
 1. **Repository Synchronization:** Pulls incoming commits from `origin/main`.
 2. **Virtual Environment Isolation:** Activates `/home/admin/pi-telegram-chat-bot/venv`.

@@ -1,8 +1,8 @@
 #!/bin/bash
-# Pull-based deployment script for production Telegram bot
-# Strictly follows the deployment contract sequence from 05-deployment-and-cicd.md
+# Application deployment script executed after git pull completes.
+# Handles virtual environment, dependencies, database migrations, testing, and service reload.
 
-set -e
+set -euo pipefail
 
 # Timestamped logging helper functions
 log_info() {
@@ -23,32 +23,28 @@ on_error() {
 }
 trap 'on_error $LINENO "$BASH_COMMAND"' ERR
 
-log_info "Starting production deployment..."
+log_info "Starting application deployment..."
 
-# Step 1: Navigate to the production bot directory
+# Step 1: Navigate to repository root
 cd ~/pi-telegram-chat-bot
 
-# Step 2: Fetch and merge latest code from origin main
-log_info "Pulling latest code from origin main..."
-git pull origin main
-
-# Step 3: Activate isolated Python virtual environment
+# Step 2: Activate isolated Python virtual environment
 log_info "Activating virtual environment..."
 source venv/bin/activate
 
-# Step 4: Install/update dependencies non-interactively
+# Step 3: Install/update dependencies non-interactively
 log_info "Verifying dependencies..."
 pip install --no-input -r requirements.txt
 
-# Step 5: Apply SQLite schema initialization / migrations
+# Step 4: Apply SQLite schema initialization / migrations
 log_info "Applying SQLite database migrations..."
 python -c "from core.database import init_db; init_db()"
 
-# Step 6: Run test suite; halts script via trap if any test fails
+# Step 5: Run test suite; halts script via trap if any test fails
 log_info "Running unit tests with pytest..."
 pytest
 
-# Step 7: Restart the systemd service (only reached if all tests pass)
+# Step 6: Restart the systemd service (only reached if all tests pass)
 log_info "All tests passed. Restarting telegram-bot.service..."
 sudo systemctl restart telegram-bot.service
 
