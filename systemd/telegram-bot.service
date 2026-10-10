@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=simple
 User=admin
 WorkingDirectory=/home/admin/pi-telegram-chat-bot
+Environment=PYTHONUNBUFFERED=1
 ExecStart=/home/admin/pi-telegram-chat-bot/venv/bin/python main.py
 Restart=always
 RestartSec=5

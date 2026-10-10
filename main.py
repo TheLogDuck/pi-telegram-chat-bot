@@ -3,6 +3,10 @@ import asyncio
 import os
 import sys
 from dotenv import load_dotenv
+
+# Load environment configuration early so logging and module singletons reflect .env settings
+load_dotenv()
+
 from telegram.ext import Application, ApplicationBuilder
 from core.database.connection import init_db
 from core.database.messages import async_cleanup_old_messages
@@ -18,8 +22,6 @@ from modules.meme import register_meme
 from modules.auth import register_auth
 from modules.persona import register_persona
 from modules.reactions import register_reactions
-
-
 
 logger = setup_logger("main")
 
@@ -68,9 +70,6 @@ async def on_shutdown(app: Application) -> None:
 
 def main() -> None:
     """Bootstraps the database and starts the Telegram long-polling loop."""
-    # Load secrets and environment parameters from .env
-    load_dotenv()
-
     # Initialize SQLite database schema
     try:
         init_db()

@@ -14,3 +14,16 @@ def test_third_party_loggers_are_silenced() -> None:
     assert logging.getLogger("httpx").level == logging.WARNING
     assert logging.getLogger("httpcore").level == logging.WARNING
     assert logging.getLogger("telegram.ext").level == logging.WARNING
+
+
+def test_setup_logger_respects_env_vars(monkeypatch) -> None:
+    """Verifies that setup_logger respects environment variables like LOG_LEVEL."""
+    import core.logger
+    # Temporarily reset initialization flag for isolated unit testing
+    monkeypatch.setattr(core.logger, "_LOGGING_INITIALIZED", False)
+    monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+
+    logger = core.logger.setup_logger("debug_module")
+    root_logger = logging.getLogger()
+    assert root_logger.level == logging.DEBUG
+
