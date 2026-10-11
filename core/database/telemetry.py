@@ -133,6 +133,19 @@ def get_token_usage_stats(db_path: Optional[str] = None) -> dict:
             for row in feature_rows
         }
 
+        # Query most recently used model
+        cursor.execute(
+            "SELECT model FROM token_usage WHERE model IS NOT NULL AND model != '' ORDER BY id DESC LIMIT 1;"
+        )
+        last_model_row = cursor.fetchone()
+        last_used_model = last_model_row["model"] if last_model_row else None
+
+        # Query all distinct models used across recorded history
+        cursor.execute(
+            "SELECT DISTINCT model FROM token_usage WHERE model IS NOT NULL AND model != '' ORDER BY model ASC;"
+        )
+        models_used = [row["model"] for row in cursor.fetchall()]
+
         return {
             "today": {
                 "calls": today_row["calls_count"],
@@ -149,6 +162,8 @@ def get_token_usage_stats(db_path: Optional[str] = None) -> dict:
                 "cost_usd": total_row["cost_usd"],
             },
             "by_feature": by_feature,
+            "last_used_model": last_used_model,
+            "models_used": models_used,
         }
 
 

@@ -5,7 +5,7 @@ A production-grade, asynchronous AI assistant engineered for resource-constraine
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![Telegram Bot API](https://img.shields.io/badge/telegram--bot--api-v20%2B%20async-blue.svg)](https://python-telegram-bot.org/)
 [![Memory Footprint](https://img.shields.io/badge/memory%20footprint-~53%20MB%20RAM-success.svg)](https://github.com/)
-[![Test Suite](https://img.shields.io/badge/tests-153%20passed-brightgreen.svg)](https://pytest.org/)
+[![Test Suite](https://img.shields.io/badge/tests-161%20passed-brightgreen.svg)](https://pytest.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ---
@@ -21,11 +21,11 @@ This project demonstrates the design and deployment of a resilient, full-stack e
 - **Multi-Model LLM Resilience & Cascading Failover:** Built on the official `google-genai` SDK with an automated fallback cascade across multiple Gemini Flash models (`gemini-3.8-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, and latest aliases) to smoothly handle rate limits, transient provider errors, and quota exhaustion without user disruption.
 - **Multimodal Generation ("Nano Banana" Engine):** Dynamic image generation and editing using Google's lightweight image models (`gemini-3.1-flash-lite-image`, `gemini-2.5-flash-image`, `gemini-3-pro-image`) with automatic priority failover ordered from lowest to highest per-image cost.
 - **Search Grounding with Automatic Degradation:** Integrates real-time Google Search Grounding for dynamic news digests. Dynamically detects API quota exhaustion (HTTP 429) and falls back cleanly to internal knowledge synthesis without crashing.
-- **Zero-Dependency Multilingual Intent Classifier:** Custom intent recognition supporting Ukrainian, Russian, and English with typo-tolerant fuzzy matching implemented via Python's standard library `difflib`. Routes natural language queries to distinct features without loading multi-hundred-megabyte NLP weights into memory.
-- **FinOps & Token Telemetry:** Real-time tracking of prompt tokens, completion tokens, call frequencies, and estimated USD expenditure logged into SQLite. Exposes live financial analytics via an owner-only `/stats` command.
+- **FinOps & Google Cloud Telemetry:** Combines local SQLite token tracking with official server-side Google Cloud metrics via direct lightweight REST API endpoints (`core/gcp`). Invoiced month-to-date dollar expenditures are queried from BigQuery Billing Export, and real-time request velocities are retrieved from Cloud Monitoring API, keeping the entire process under a lean memory footprint (< 60 MB RAM). Exposes live financial telemetry and model tracking via an owner-only `/stats` command.
+- **Dedicated Access Control Gatekeeper:** Enforces a private whitelist for both individual users and group chats (`modules/access_control.py`). Intercepts messages at priority group -1, maintains sub-microsecond in-memory caching, and sends interactive admin approval prompts.
 - **Low-Overhead Persistent Storage (SQLite WAL):** Local persistence utilizing Write-Ahead Logging (`PRAGMA journal_mode = WAL`) for concurrent read/write performance. Includes an automated non-blocking 24-hour background task that prunes chat records past the 30-day retention window.
 - **Strict Dorm Firewall Traversal:** Runs behind an isolated university campus network with inbound client isolation. All traffic operates over outbound HTTPS long-polling (`Application.run_polling()`). Remote administration is conducted securely via a private Tailscale Mesh VPN.
-- **Test-Gated Pull-Based CI/CD:** Production updates trigger a two-tier pull-based deployment pipeline (`scripts/update.sh` -> `scripts/deploy.sh`) equipped with a bash `ERR` trap. Before reloading the systemd service, the entire test suite (153 unit tests with 100% offline mocking) must pass, guaranteeing zero-downtime regression prevention.
+- **Test-Gated Pull-Based CI/CD:** Production updates trigger a two-tier pull-based deployment pipeline (`scripts/update.sh` -> `scripts/deploy.sh`) equipped with a bash `ERR` trap. Before reloading the systemd service, the entire test suite (155 unit tests with 100% offline mocking) must pass, guaranteeing zero-downtime regression prevention.
 
 ---
 
@@ -52,7 +52,7 @@ flowchart TD
         subgraph CICD ["Pull-Based CI/CD (scripts/update.sh)"]
             GIT["Git Pull origin main"]
             MIGRATE["Schema Migrations"]
-            PYTEST["Pytest Gatekeeper (153 Tests)"]
+            PYTEST["Pytest Gatekeeper (155 Tests)"]
             RELOAD["systemctl restart telegram-bot.service"]
         end
     end
@@ -122,7 +122,7 @@ sequenceDiagram
 | **CPU Usage** | < 1% idle, < 15% peak during active generation | Offloads compute-heavy inference to cloud API via async I/O. |
 | **Database Engine** | SQLite 3 (`bot_memory.db`) with Write-Ahead Logging (`WAL`) | Near-zero RAM footprint, crash-resilient, concurrent readers. |
 | **Storage Footprint** | ~30 MB application + virtual environment | Fits easily within constrained SD storage allocations. |
-| **Unit Test Coverage** | **153 automated test cases** (100% offline mocked, ~2.0s execution) | Tests business logic, error traps, DB concurrency, and LLM retry cascades. |
+| **Unit Test Coverage** | **155 automated test cases** (100% offline mocked, ~2.0s execution) | Tests business logic, error traps, DB concurrency, and LLM retry cascades. |
 | **Network Architecture** | Long-polling outbound HTTPS (Telegram API) + Tailscale Mesh VPN | Bypasses dorm NAT firewalls without port forwarding or webhooks. |
 
 ---
@@ -159,15 +159,18 @@ sequenceDiagram
 - Users can trigger bot capabilities organically in conversation without memorizing rigid slash command syntax.
 
 ### 7. Real-Time Token Telemetry & FinOps (`/stats`)
-- Captures `prompt_token_count` and `candidates_token_count` from API response metadata for every LLM interaction.
-- Computes estimated dollar costs in real time according to provider pricing tiers.
-- Restricted to the bot administrator (`ADMIN_CHAT_ID`) to provide transparency on daily and cumulative API usage broken down by feature.
+- Combines local SQLite telemetry with official Google Cloud Platform server-side metrics (`core/gcp`).
+- **Model Tracking:** Displays default text model (`gemini-3.8-flash`), default image model (`gemini-3.1-flash-lite-image`), and the most recently utilized model.
+- **Official Invoiced Spend:** Queries Google Cloud Billing Export tables via BigQuery REST API to display real-time month-to-date (MTD) dollar costs.
+- **Live Velocity:** Retrieves 10-minute trailing request velocity from the Cloud Monitoring API.
+- **Zero-SDK Architecture:** Avoids heavy multi-hundred-megabyte client SDKs by executing direct REST queries via `httpx` and `google-auth`, keeping memory usage under 60 MB RAM.
+- Restricted strictly to the bot administrator (`ADMIN_CHAT_ID`).
 
 ### 8. Manual Gatekeeper & Access Control Whitelist (`/approve`, `/reject`, `/access`)
-- Protects the bot from unauthorized exposure with a manual approval workflow.
+- Implemented in `modules/access_control.py` to enforce strict authorization before any command or AI handler executes.
 - Hybrid authorization scope: whitelists group chats as a whole and whitelists users individually in private messages.
 - When an unauthorized entity addresses the bot, the administrator receives a Telegram alert with interactive `[Схвалити]` and `[Відхилити]` inline buttons.
-- Features sub-microsecond in-memory caching and SQLite persistence in the `access_grants` table.
+- Features sub-microsecond in-memory caching (`_APPROVED_CACHE`) and SQLite persistence in the `access_grants` table.
 
 ### 9. Dynamic Persona Customization (`/persona`)
 - Customizes conversational tone and demeanor (e.g., standard assistant, sarcastic "Meme Lord") via interactive Telegram inline keyboards or direct command arguments.
@@ -232,6 +235,11 @@ LOG_TO_CONSOLE=true
 LOG_TO_FILE=true
 LOG_FILE_PATH=bot.log
 DATABASE_PATH=bot_memory.db
+
+# Google Cloud Platform (FinOps & Telemetry)
+GCP_PROJECT_ID=your-project-id
+GCP_SERVICE_ACCOUNT_FILE=gcp_service_account.json
+GCP_BILLING_TABLE=your_dataset.gcp_billing_export_v1_XXXXXX_XXXXXX_XXXXXX
 ```
 
 ### 5. Execute Offline Unit Tests
@@ -239,7 +247,7 @@ Run the comprehensive test suite to confirm complete local readiness:
 ```bash
 pytest
 ```
-*Expected: 153 passed tests in approximately 2 seconds.*
+*Expected: 155 passed tests in approximately 2 seconds.*
 
 ### 6. Run the Application
 ```bash
@@ -328,5 +336,5 @@ To eliminate Telegram `409 Conflict` errors caused by concurrent long-polling lo
 
 ## Testing Strategy
 
-- **Unit Testing (153 tests):** All components (database queries, logging, intent parsing, error handling, token math, command routing) are tested offline with zero external network calls. Telegram and Gemini APIs are fully mocked with `unittest.mock`.
+- **Unit Testing (155 tests):** All components (database queries, logging, intent parsing, error handling, token math, command routing) are tested offline with zero external network calls. Telegram and Gemini APIs are fully mocked with `unittest.mock`.
 - **End-to-End Synthetic Testing (`tests/e2e_tester.py`):** Features a headless test runner bot client (`TEST_RUNNER_BOT_TOKEN`) that fires synthetic user messages into a designated test group (`TEST_GROUP_CHAT_ID`) to validate live bot responses before merging to production.

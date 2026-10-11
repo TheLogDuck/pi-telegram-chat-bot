@@ -44,10 +44,37 @@ def test_fetch_quota_limits_success() -> None:
         quotas = asyncio.run(fetch_quota_limits(project_id="test-proj", access_token="test-token"))
 
         assert len(quotas) == 2
-        assert quotas[0].metric_name == "GenerateContentRequestsPerMinute"
+        assert quotas[0].metric_name == "Запитів/хв (RPM)"
         assert quotas[0].limit == 1000.0
-        assert quotas[1].metric_name == "GenerateContentTokensPerMinute"
+        assert quotas[1].metric_name == "Токенів/хв (TPM)"
         assert quotas[1].limit == 4000000.0
+
+
+def test_fetch_quota_limits_with_model_dimension() -> None:
+    """Verifies that model dimensions are extracted and appended to the label."""
+    mock_payload = {
+        "quotaInfos": [
+            {
+                "quotaId": "GenerateContentRequestsPerDay",
+                "dimensionsInfos": [
+                    {
+                        "dimensions": {"model": "models/gemini-1.5-pro"},
+                        "details": {"value": "100"},
+                    }
+                ],
+            }
+        ]
+    }
+    mock_response = MagicMock(spec=httpx.Response)
+    mock_response.status_code = 200
+    mock_response.json.return_value = mock_payload
+
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_response
+        quotas = asyncio.run(fetch_quota_limits(project_id="test-proj", access_token="test-token"))
+        assert len(quotas) == 1
+        assert "gemini-1.5-pro" in quotas[0].metric_name
+        assert quotas[0].limit == 100.0
 
 
 def test_fetch_quota_limits_http_error() -> None:

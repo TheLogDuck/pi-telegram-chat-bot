@@ -7,6 +7,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from typing import Optional
 from core.database.telemetry import async_get_token_usage_stats
 from core.gcp import GCPTelemetryReport, get_gcp_telemetry
+from core.llm import DEFAULT_IMAGE_MODEL, DEFAULT_MODEL
 from core.logger import setup_logger
 
 logger = setup_logger("analytics")
@@ -33,61 +34,56 @@ def is_owner(update: Update) -> bool:
 
 
 def format_stats_report(stats: dict, gcp_report: Optional[GCPTelemetryReport] = None) -> str:
-    """Renders usage data into a clean, readable text report in Ukrainian."""
-    today = stats.get("today", {})
-    total = stats.get("total", {})
-    by_feature = stats.get("by_feature", {})
+    """Renders strictly official Google Cloud usage and billing telemetry report in Ukrainian."""
+    if not gcp_report or not gcp_report.is_available:
+        return (
+            "<b>Статистика використання Gemini API (Google Cloud):</b>\n\n"
+            "Сервіс телеметрії GCP не налаштований або облікові дані відсутні.\n"
+            "Перевірте налаштування <code>GCP_PROJECT_ID</code> та <code>GCP_SERVICE_ACCOUNT_FILE</code> у .env."
+        )
 
     lines = [
-        "<b>Статистика використання Gemini API (Tier 1)</b>\n",
-        "<b>Тариф:</b> Pay-as-you-go (Tier 1)\n",
-        "<b>Сьогодні (UTC):</b>",
-        f"  - Запитів: {today.get('calls', 0)}",
-        f"  - Токенів: {today.get('total_tokens', 0):,} (Вхід: {today.get('prompt_tokens', 0):,} | Вихід: {today.get('completion_tokens', 0):,})",
-        f"  - Орієнтовна вартість: ${today.get('cost_usd', 0.0):.4f}\n",
-        "<b>За весь час (Локальний підрахунок):</b>",
-        f"  - Запитів: {total.get('calls', 0)}",
-        f"  - Токенів: {total.get('total_tokens', 0):,}",
-        f"  - Орієнтовна вартість: ${total.get('cost_usd', 0.0):.4f}\n",
+        "<b>Статистика використання Gemini API (Google Cloud)</b>\n",
+        "<b>Сервіс:</b> Gemini API (<code>generativelanguage.googleapis.com</code>)\n",
     ]
 
-    if by_feature:
-        lines.append("<b>Використання за функціями:</b>")
-        for feat, data in by_feature.items():
-            label = FEATURE_LABELS.get(feat, feat)
+    # Model tracking: display default models (text & image) and runtime usage
+    default_text_model = stats.get("default_model") or DEFAULT_MODEL
+    default_image_model = stats.get("default_image_model") or DEFAULT_IMAGE_MODEL
+    last_used = stats.get("last_used_model")
+    models_used = stats.get("models_used", [])
+
+    lines.append("<b>Моделі (Models):</b>")
+    lines.append(f"  • Текст (Default Text): <code>{default_text_model}</code>")
+    lines.append(f"  • Зображення (Default Image): <code>{default_image_model}</code>")
+    if last_used:
+        lines.append(f"  • Останнє використання (Last used): <code>{last_used}</code>")
+    lines.append("")
+
+    # 1. Billing / Actual Invoiced Spend
+    lines.append("<b>Фактичні витрати (Google Cloud Billing):</b>")
+    if gcp_report.billing:
+        if gcp_report.billing.status == "synced":
             lines.append(
-                f"  - {label}: {data.get('calls', 0)} запитів | "
-                f"{data.get('tokens', 0):,} токенів (${data.get('cost_usd', 0.0):.4f})"
+                f"  - Нараховано за місяць (MTD): <b>${gcp_report.billing.cost_usd:.4f} {gcp_report.billing.currency}</b>"
             )
+        elif gcp_report.billing.status == "pending_first_export":
+            lines.append("  - Нараховано за місяць (MTD): <i>Очікується перший експорт BigQuery (~1-2 год)</i>")
+        elif gcp_report.billing.status == "unconfigured":
+            lines.append("  - Нараховано за місяць (MTD): <i>BigQuery таблиця не налаштована в .env</i>")
+        else:
+            lines.append("  - Нараховано за місяць (MTD): <i>Помилка підключення до BigQuery</i>")
+    lines.append("")
+
+    # 2. Live Velocity (Cloud Monitoring)
+    if gcp_report.usage:
+        lines.append("<b>Поточне споживання квоти (Cloud Monitoring API):</b>")
+        lines.append(
+            f"  - Швидкість запитів (останні 10 хв): <b>{gcp_report.usage.current_rate_usage:.2f}</b> req/min"
+        )
         lines.append("")
 
-    if gcp_report and gcp_report.is_available:
-        lines.append("<b>Офіційні дані Google Cloud (GCP):</b>")
-        if gcp_report.billing:
-            if gcp_report.billing.status == "synced":
-                lines.append(
-                    f"  - Фактичні витрати (MTD): ${gcp_report.billing.cost_usd:.4f} {gcp_report.billing.currency}"
-                )
-            elif gcp_report.billing.status == "pending_first_export":
-                lines.append("  - Фактичні витрати (MTD): Очікується перший експорт BigQuery (~1-2 год)")
-            elif gcp_report.billing.status == "unconfigured":
-                lines.append("  - Фактичні витрати (MTD): BigQuery таблиця не налаштована")
-
-        if gcp_report.quotas:
-            lines.append("  - Ліміти квот (Cloud Quotas):")
-            for q in gcp_report.quotas:
-                lines.append(f"    • {q.metric_name}: {q.limit:,.0f} {q.unit}")
-
-        if gcp_report.usage:
-            lines.append(
-                f"  - Поточна швидкість (Monitoring): {gcp_report.usage.current_rate_usage:.2f} req/min"
-            )
-        lines.append("")
-
-    lines.append(
-        "<i>Ліміти Tier 1: ~1,000 RPM (текст) | ~500 RPM / 2,000 RPD (Nano Banana).</i>"
-    )
-    return "\n".join(lines)
+    return "\n".join(lines).strip()
 
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -110,10 +106,20 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     gcp_report = await get_gcp_telemetry()
 
     report_text = format_stats_report(stats, gcp_report)
-    await update.effective_message.reply_text(
-        report_text,
-        parse_mode=ParseMode.HTML,
-    )
+    MAX_TELEGRAM_LEN = 4000
+    if len(report_text) <= MAX_TELEGRAM_LEN:
+        await update.effective_message.reply_text(
+            report_text,
+            parse_mode=ParseMode.HTML,
+        )
+    else:
+        # Deliver long reports in chunks to stay within Telegram's 4096-character limit
+        for i in range(0, len(report_text), MAX_TELEGRAM_LEN):
+            chunk = report_text[i:i + MAX_TELEGRAM_LEN]
+            await update.effective_message.reply_text(
+                chunk,
+                parse_mode=ParseMode.HTML,
+            )
 
 
 def register_analytics(app: Application) -> None:

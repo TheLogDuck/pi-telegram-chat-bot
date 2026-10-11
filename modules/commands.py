@@ -4,7 +4,7 @@ from telegram import BotCommand, BotCommandScopeChat, BotCommandScopeDefault, Up
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 from core.logger import setup_logger
-from modules.auth import is_admin
+from modules.access_control import is_admin
 
 
 logger = setup_logger("commands")

@@ -19,7 +19,7 @@ from modules.listener import register_listener
 from modules.news import register_news
 from modules.roast import register_roast
 from modules.meme import register_meme
-from modules.auth import register_auth
+from modules.access_control import register_access_control
 from modules.persona import register_persona
 from modules.reactions import register_reactions
 
@@ -98,7 +98,7 @@ def main() -> None:
     register_listener(app)
 
     # Register authorization gatekeeper and admin callbacks (group -1)
-    register_auth(app)
+    register_access_control(app)
 
     # Register standard bot commands (group 0)
     register_commands(app)

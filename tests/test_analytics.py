@@ -30,37 +30,11 @@ def test_is_owner(monkeypatch: pytest.MonkeyPatch) -> None:
     assert is_owner(update_owner) is False
 
 
-def test_format_stats_report() -> None:
-    """Verifies that format_stats_report structures the summary cleanly."""
-    mock_stats = {
-        "today": {
-            "calls": 5,
-            "prompt_tokens": 1200,
-            "completion_tokens": 800,
-            "total_tokens": 2000,
-            "cost_usd": 0.00044,
-        },
-        "total": {
-            "calls": 15,
-            "prompt_tokens": 5000,
-            "completion_tokens": 3000,
-            "total_tokens": 8000,
-            "cost_usd": 0.0017,
-        },
-        "by_feature": {
-            "chat": {"calls": 10, "tokens": 5000, "cost_usd": 0.001},
-            "news": {"calls": 5, "tokens": 3000, "cost_usd": 0.0007},
-        },
-    }
-
-    report = format_stats_report(mock_stats)
-
-    assert "Сьогодні (UTC):" in report
-    assert "2,000" in report
-    assert "$0.0004" in report
-    assert "Діалоги (Chat): 10 запитів" in report
-    assert "Новини (News): 5 запитів" in report
-    assert "Ліміти Tier 1" in report
+def test_format_stats_report_unconfigured() -> None:
+    """Verifies that format_stats_report handles unconfigured GCP telemetry gracefully."""
+    report = format_stats_report({})
+    assert "Статистика використання Gemini API (Google Cloud)" in report
+    assert "не налаштований" in report
 
 
 def test_format_stats_report_with_gcp_telemetry() -> None:
@@ -72,12 +46,6 @@ def test_format_stats_report_with_gcp_telemetry() -> None:
         GCPUsageMetrics,
     )
 
-    mock_stats = {
-        "today": {"calls": 1, "total_tokens": 100, "prompt_tokens": 80, "completion_tokens": 20, "cost_usd": 0.0001},
-        "total": {"calls": 1, "total_tokens": 100, "cost_usd": 0.0001},
-        "by_feature": {},
-    }
-
     gcp_report = GCPTelemetryReport(
         is_available=True,
         quotas=[GCPQuotaInfo(metric_name="RPM", limit=1000.0, unit="1/min")],
@@ -85,12 +53,32 @@ def test_format_stats_report_with_gcp_telemetry() -> None:
         billing=GCPBillingInfo(cost_usd=0.15, currency="USD", status="synced"),
     )
 
-    report = format_stats_report(mock_stats, gcp_report)
+    stats = {
+        "last_used_model": "gemini-3.8-flash",
+        "models_used": ["gemini-3.8-flash", "gemini-3.5-flash-lite"],
+    }
+    report = format_stats_report(stats, gcp_report)
 
-    assert "Офіційні дані Google Cloud (GCP):" in report
+    assert "Статистика використання Gemini API (Google Cloud)" in report
+    assert "Текст (Default Text): <code>gemini-3.8-flash</code>" in report
+    assert "Зображення (Default Image): <code>gemini-3.1-flash-lite-image</code>" in report
+    assert "Останнє використання (Last used): <code>gemini-3.8-flash</code>" in report
+    assert "Всі задіяні" not in report
     assert "$0.1500 USD" in report
-    assert "RPM: 1,000 1/min" in report
-    assert "3.50 req/min" in report
+    assert "Cloud Quotas API" not in report
+    assert "<b>3.50</b> req/min" in report
+
+
+def test_format_stats_report_no_quotas_rendered() -> None:
+    """Verifies that format_stats_report omits Cloud Quotas API limits."""
+    from core.gcp import GCPQuotaInfo, GCPTelemetryReport
+
+    gcp_report = GCPTelemetryReport(
+        is_available=True,
+        quotas=[GCPQuotaInfo(metric_name="RPM", limit=100.0, unit="1/min")],
+    )
+    report = format_stats_report({}, gcp_report)
+    assert "Cloud Quotas API" not in report
 
 
 def test_stats_command_owner(monkeypatch: pytest.MonkeyPatch) -> None:

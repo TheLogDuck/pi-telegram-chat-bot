@@ -126,6 +126,10 @@ def test_save_and_get_token_usage_stats(tmp_path):
     assert "news" in stats["by_feature"]
     assert stats["by_feature"]["news"]["tokens"] == 500
 
+    # Verify model tracking (last used and distinct models)
+    assert stats["last_used_model"] == "gemini-3.8-flash"
+    assert stats["models_used"] == ["gemini-3.8-flash"]
+
 
 def test_cleanup_old_messages(tmp_path):
     """Verifies that cleanup_old_messages deletes rows older than retention_days."""

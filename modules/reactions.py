@@ -13,7 +13,7 @@ from core.database.reactions import (
 )
 from core.llm import decide_message_reaction
 from core.logger import setup_logger
-from modules.auth import is_admin
+from modules.access_control import is_admin
 
 
 logger = setup_logger("reactions")

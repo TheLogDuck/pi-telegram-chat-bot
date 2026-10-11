@@ -21,6 +21,20 @@ async def fetch_month_to_date_spend(
     if not table_name:
         return GCPBillingInfo(cost_usd=0.0, currency="USD", status="unconfigured")
 
+    # Detect default placeholder configuration from .env.example
+    lower_table = table_name.lower()
+    if "your-project-id" in lower_table or "xxxxxx" in lower_table:
+        logger.debug("Placeholder GCP_BILLING_TABLE detected; treating as unconfigured.")
+        return GCPBillingInfo(cost_usd=0.0, currency="USD", status="unconfigured")
+
+    # BigQuery requires table identifiers to be qualified with a dataset (e.g. dataset.table)
+    if "." not in table_name:
+        logger.warning(
+            f"GCP_BILLING_TABLE '{table_name}' is missing dataset qualification. "
+            "BigQuery requires 'dataset.table' (e.g., 'billing_data.gcp_billing_export_...')."
+        )
+        return GCPBillingInfo(cost_usd=0.0, currency="USD", status="unconfigured")
+
     url = BIGQUERY_QUERY_URL.format(project_id=project_id)
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -40,9 +54,11 @@ async def fetch_month_to_date_spend(
         try:
             resp = await http_client.post(url, headers=headers, json=body, timeout=7.0)
 
-            # Table has not yet been exported by Google's background sync
-            if resp.status_code == 404:
-                logger.info("BigQuery billing export table not found. Awaiting first export sync.")
+            # Table has not yet been exported by Google's background sync (Google returns 404 or 403 with 'does not exist')
+            if resp.status_code == 404 or (
+                resp.status_code == 403 and ("does not exist" in resp.text.lower() or "not found" in resp.text.lower())
+            ):
+                logger.info("BigQuery billing export table not yet created by Google sync. Awaiting export.")
                 return GCPBillingInfo(cost_usd=0.0, currency="USD", status="pending_first_export")
 
             if resp.status_code != 200:

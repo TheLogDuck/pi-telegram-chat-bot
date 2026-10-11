@@ -1,7 +1,7 @@
 # Unit tests for bot commands (/start, /help, /ping, /stats).
 # Mocks Telegram Update and Context objects to ensure 100% offline test execution.
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from telegram import Update
 from telegram.constants import ParseMode
 from modules.commands import (
@@ -103,11 +103,16 @@ def test_stats_command_owner(monkeypatch) -> None:
     mock_update.effective_user.id = 12345
     mock_context = MagicMock()
 
-    asyncio.run(stats_command(mock_update, mock_context))
+    with patch("modules.analytics.get_gcp_telemetry", new_callable=AsyncMock) as m_gcp:
+        from core.gcp import GCPTelemetryReport
 
-    assert mock_update.effective_message.reply_text.await_count == 1
-    call_args = mock_update.effective_message.reply_text.await_args
-    assert "Статистика використання Gemini API" in call_args[0][0]
+        m_gcp.return_value = GCPTelemetryReport(is_available=False)
+
+        asyncio.run(stats_command(mock_update, mock_context))
+
+        assert mock_update.effective_message.reply_text.await_count == 1
+        call_args = mock_update.effective_message.reply_text.await_args
+        assert "Статистика використання Gemini API" in call_args[0][0]
 
 
 def test_set_bot_commands(monkeypatch) -> None:

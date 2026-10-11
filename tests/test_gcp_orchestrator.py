@@ -57,6 +57,8 @@ def test_get_gcp_telemetry_success(monkeypatch: pytest.MonkeyPatch) -> None:
 
                     assert report.is_available is True
                     assert len(report.quotas) == 1
+                    assert report.usage is not None
                     assert report.usage.current_rate_usage == 1.5
+                    assert report.billing is not None
                     assert report.billing.cost_usd == 0.08
                     assert report.billing.status == "synced"
