@@ -5,7 +5,7 @@ A production-grade, asynchronous AI assistant engineered for resource-constraine
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![Telegram Bot API](https://img.shields.io/badge/telegram--bot--api-v20%2B%20async-blue.svg)](https://python-telegram-bot.org/)
 [![Memory Footprint](https://img.shields.io/badge/memory%20footprint-~53%20MB%20RAM-success.svg)](https://github.com/)
-[![Test Suite](https://img.shields.io/badge/tests-135%20passed-brightgreen.svg)](https://pytest.org/)
+[![Test Suite](https://img.shields.io/badge/tests-153%20passed-brightgreen.svg)](https://pytest.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ---
@@ -25,7 +25,7 @@ This project demonstrates the design and deployment of a resilient, full-stack e
 - **FinOps & Token Telemetry:** Real-time tracking of prompt tokens, completion tokens, call frequencies, and estimated USD expenditure logged into SQLite. Exposes live financial analytics via an owner-only `/stats` command.
 - **Low-Overhead Persistent Storage (SQLite WAL):** Local persistence utilizing Write-Ahead Logging (`PRAGMA journal_mode = WAL`) for concurrent read/write performance. Includes an automated non-blocking 24-hour background task that prunes chat records past the 30-day retention window.
 - **Strict Dorm Firewall Traversal:** Runs behind an isolated university campus network with inbound client isolation. All traffic operates over outbound HTTPS long-polling (`Application.run_polling()`). Remote administration is conducted securely via a private Tailscale Mesh VPN.
-- **Test-Gated Pull-Based CI/CD:** Production updates trigger a two-tier pull-based deployment pipeline (`scripts/update.sh` -> `scripts/deploy.sh`) equipped with a bash `ERR` trap. Before reloading the systemd service, the entire test suite (135 unit tests with 100% offline mocking) must pass, guaranteeing zero-downtime regression prevention.
+- **Test-Gated Pull-Based CI/CD:** Production updates trigger a two-tier pull-based deployment pipeline (`scripts/update.sh` -> `scripts/deploy.sh`) equipped with a bash `ERR` trap. Before reloading the systemd service, the entire test suite (153 unit tests with 100% offline mocking) must pass, guaranteeing zero-downtime regression prevention.
 
 ---
 
@@ -52,7 +52,7 @@ flowchart TD
         subgraph CICD ["Pull-Based CI/CD (scripts/update.sh)"]
             GIT["Git Pull origin main"]
             MIGRATE["Schema Migrations"]
-            PYTEST["Pytest Gatekeeper (135 Tests)"]
+            PYTEST["Pytest Gatekeeper (153 Tests)"]
             RELOAD["systemctl restart telegram-bot.service"]
         end
     end
@@ -122,7 +122,7 @@ sequenceDiagram
 | **CPU Usage** | < 1% idle, < 15% peak during active generation | Offloads compute-heavy inference to cloud API via async I/O. |
 | **Database Engine** | SQLite 3 (`bot_memory.db`) with Write-Ahead Logging (`WAL`) | Near-zero RAM footprint, crash-resilient, concurrent readers. |
 | **Storage Footprint** | ~30 MB application + virtual environment | Fits easily within constrained SD storage allocations. |
-| **Unit Test Coverage** | **135 automated test cases** (100% offline mocked, ~2.0s execution) | Tests business logic, error traps, DB concurrency, and LLM retry cascades. |
+| **Unit Test Coverage** | **153 automated test cases** (100% offline mocked, ~2.0s execution) | Tests business logic, error traps, DB concurrency, and LLM retry cascades. |
 | **Network Architecture** | Long-polling outbound HTTPS (Telegram API) + Tailscale Mesh VPN | Bypasses dorm NAT firewalls without port forwarding or webhooks. |
 
 ---
@@ -239,7 +239,7 @@ Run the comprehensive test suite to confirm complete local readiness:
 ```bash
 pytest
 ```
-*Expected: 135 passed tests in approximately 2 seconds.*
+*Expected: 153 passed tests in approximately 2 seconds.*
 
 ### 6. Run the Application
 ```bash
@@ -328,5 +328,5 @@ To eliminate Telegram `409 Conflict` errors caused by concurrent long-polling lo
 
 ## Testing Strategy
 
-- **Unit Testing (135 tests):** All components (database queries, logging, intent parsing, error handling, token math, command routing) are tested offline with zero external network calls. Telegram and Gemini APIs are fully mocked with `unittest.mock`.
+- **Unit Testing (153 tests):** All components (database queries, logging, intent parsing, error handling, token math, command routing) are tested offline with zero external network calls. Telegram and Gemini APIs are fully mocked with `unittest.mock`.
 - **End-to-End Synthetic Testing (`tests/e2e_tester.py`):** Features a headless test runner bot client (`TEST_RUNNER_BOT_TOKEN`) that fires synthetic user messages into a designated test group (`TEST_GROUP_CHAT_ID`) to validate live bot responses before merging to production.

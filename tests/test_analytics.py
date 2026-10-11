@@ -93,8 +93,7 @@ def test_format_stats_report_with_gcp_telemetry() -> None:
     assert "3.50 req/min" in report
 
 
-@pytest.mark.asyncio
-async def test_stats_command_owner(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_stats_command_owner(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that stats_command queries both SQLite and GCP telemetry when invoked by owner."""
     monkeypatch.setenv("ADMIN_CHAT_ID", "12345")
 
@@ -118,7 +117,7 @@ async def test_stats_command_owner(monkeypatch: pytest.MonkeyPatch) -> None:
             }
             m_gcp.return_value = GCPTelemetryReport(is_available=False)
 
-            await stats_command(update, context)
+            asyncio.run(stats_command(update, context))
 
             assert m_stats.call_count == 1
             assert m_gcp.call_count == 1

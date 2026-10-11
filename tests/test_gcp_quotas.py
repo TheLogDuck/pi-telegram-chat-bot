@@ -1,5 +1,6 @@
 # Unit tests for core/gcp/quotas.py
 # Validates parsing of Cloud Quotas API and Cloud Monitoring API responses with offline mocks.
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
@@ -7,8 +8,7 @@ import pytest
 from core.gcp.quotas import fetch_quota_limits, fetch_rate_usage
 
 
-@pytest.mark.asyncio
-async def test_fetch_quota_limits_success() -> None:
+def test_fetch_quota_limits_success() -> None:
     """Verifies that quotaInfos payload is parsed into GCPQuotaInfo objects."""
     mock_payload = {
         "quotaInfos": [
@@ -41,7 +41,7 @@ async def test_fetch_quota_limits_success() -> None:
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
 
-        quotas = await fetch_quota_limits(project_id="test-proj", access_token="test-token")
+        quotas = asyncio.run(fetch_quota_limits(project_id="test-proj", access_token="test-token"))
 
         assert len(quotas) == 2
         assert quotas[0].metric_name == "GenerateContentRequestsPerMinute"
@@ -50,8 +50,7 @@ async def test_fetch_quota_limits_success() -> None:
         assert quotas[1].limit == 4000000.0
 
 
-@pytest.mark.asyncio
-async def test_fetch_quota_limits_http_error() -> None:
+def test_fetch_quota_limits_http_error() -> None:
     """Verifies that HTTP errors return an empty list without raising exceptions."""
     mock_response = MagicMock(spec=httpx.Response)
     mock_response.status_code = 403
@@ -59,12 +58,11 @@ async def test_fetch_quota_limits_http_error() -> None:
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
 
-        quotas = await fetch_quota_limits(project_id="test-proj", access_token="test-token")
+        quotas = asyncio.run(fetch_quota_limits(project_id="test-proj", access_token="test-token"))
         assert quotas == []
 
 
-@pytest.mark.asyncio
-async def test_fetch_rate_usage_success() -> None:
+def test_fetch_rate_usage_success() -> None:
     """Verifies that Cloud Monitoring time-series payload extracts the latest rate data point."""
     mock_payload = {
         "timeSeries": [
@@ -90,15 +88,14 @@ async def test_fetch_rate_usage_success() -> None:
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
 
-        usage = await fetch_rate_usage(project_id="test-proj", access_token="test-token")
+        usage = asyncio.run(fetch_rate_usage(project_id="test-proj", access_token="test-token"))
 
         assert usage is not None
         assert usage.current_rate_usage == 5.4
         assert usage.quota_metric == "generativelanguage.googleapis.com/requests"
 
 
-@pytest.mark.asyncio
-async def test_fetch_rate_usage_no_points() -> None:
+def test_fetch_rate_usage_no_points() -> None:
     """Verifies that an empty timeSeries array returns None cleanly."""
     mock_response = MagicMock(spec=httpx.Response)
     mock_response.status_code = 200
@@ -107,5 +104,5 @@ async def test_fetch_rate_usage_no_points() -> None:
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
 
-        usage = await fetch_rate_usage(project_id="test-proj", access_token="test-token")
+        usage = asyncio.run(fetch_rate_usage(project_id="test-proj", access_token="test-token"))
         assert usage is None

@@ -6,17 +6,21 @@ from typing import Optional
 import httpx
 from core.logger import setup_logger
 
-from .auth import get_gcp_access_token
-from .billing import fetch_month_to_date_spend
+from . import auth, billing, quotas
 from .models import (
     GCPBillingInfo,
     GCPQuotaInfo,
     GCPTelemetryReport,
     GCPUsageMetrics,
 )
-from .quotas import fetch_quota_limits, fetch_rate_usage
 
 logger = setup_logger("gcp")
+
+# Re-export key functions for external consumers
+get_gcp_access_token = auth.get_gcp_access_token
+fetch_quota_limits = quotas.fetch_quota_limits
+fetch_rate_usage = quotas.fetch_rate_usage
+fetch_month_to_date_spend = billing.fetch_month_to_date_spend
 
 __all__ = [
     "GCPQuotaInfo",
@@ -49,7 +53,7 @@ async def get_gcp_telemetry(
     if not proj_id or not key_path:
         return GCPTelemetryReport(is_available=False)
 
-    token = get_gcp_access_token(key_path)
+    token = auth.get_gcp_access_token(key_path)
     if not token:
         return GCPTelemetryReport(
             is_available=False,
@@ -59,11 +63,11 @@ async def get_gcp_telemetry(
     # Use a single shared async HTTP client for all concurrent requests
     async with httpx.AsyncClient() as client:
         # Launch Quotas, Monitoring, and BigQuery calls concurrently
-        quotas_task = fetch_quota_limits(proj_id, token, client)
-        usage_task = fetch_rate_usage(proj_id, token, client)
-        billing_task = fetch_month_to_date_spend(proj_id, tbl_name, token, client)
+        quotas_task = quotas.fetch_quota_limits(proj_id, token, client)
+        usage_task = quotas.fetch_rate_usage(proj_id, token, client)
+        billing_task = billing.fetch_month_to_date_spend(proj_id, tbl_name, token, client)
 
-        quotas, usage, billing = await asyncio.gather(
+        fetched_quotas, fetched_usage, fetched_billing = await asyncio.gather(
             quotas_task,
             usage_task,
             billing_task,
@@ -71,7 +75,7 @@ async def get_gcp_telemetry(
 
     return GCPTelemetryReport(
         is_available=True,
-        quotas=quotas,
-        usage=usage,
-        billing=billing,
+        quotas=fetched_quotas,
+        usage=fetched_usage,
+        billing=fetched_billing,
     )

@@ -1,5 +1,6 @@
 # Unit tests for core/gcp/__init__.py
 # Validates orchestrator execution, concurrent gathering, and graceful error handling.
+import asyncio
 from unittest.mock import AsyncMock, patch
 import pytest
 
@@ -12,32 +13,29 @@ from core.gcp import (
 )
 
 
-@pytest.mark.asyncio
-async def test_get_gcp_telemetry_unconfigured(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_gcp_telemetry_unconfigured(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that missing project or credentials immediately returns unavailable report."""
     monkeypatch.delenv("GCP_PROJECT_ID", raising=False)
     monkeypatch.delenv("GCP_SERVICE_ACCOUNT_FILE", raising=False)
 
-    report = await get_gcp_telemetry()
+    report = asyncio.run(get_gcp_telemetry())
     assert report.is_available is False
     assert report.quotas == []
     assert report.billing is None
 
 
-@pytest.mark.asyncio
-async def test_get_gcp_telemetry_auth_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_gcp_telemetry_auth_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that failed OAuth token acquisition returns unavailable report."""
     monkeypatch.setenv("GCP_PROJECT_ID", "test-project")
     monkeypatch.setenv("GCP_SERVICE_ACCOUNT_FILE", "fake.json")
 
     with patch("core.gcp.auth.get_gcp_access_token", return_value=None):
-        report = await get_gcp_telemetry()
+        report = asyncio.run(get_gcp_telemetry())
         assert report.is_available is False
         assert "Authentication failed" in (report.error_message or "")
 
 
-@pytest.mark.asyncio
-async def test_get_gcp_telemetry_success(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_gcp_telemetry_success(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that all three GCP data streams are gathered concurrently and aggregated."""
     monkeypatch.setenv("GCP_PROJECT_ID", "test-project")
     monkeypatch.setenv("GCP_SERVICE_ACCOUNT_FILE", "fake.json")
@@ -55,7 +53,7 @@ async def test_get_gcp_telemetry_success(monkeypatch: pytest.MonkeyPatch) -> Non
                     m_usage.return_value = mock_usage
                     m_billing.return_value = mock_billing
 
-                    report = await get_gcp_telemetry()
+                    report = asyncio.run(get_gcp_telemetry())
 
                     assert report.is_available is True
                     assert len(report.quotas) == 1
