@@ -24,7 +24,7 @@ ALLOWED_TELEGRAM_REACTIONS: frozenset[str] = frozenset({
 DEFAULT_MODEL = "gemini-3.8-flash"
 MODEL_ROTATION_CANDIDATES = [
     "gemini-3.8-flash",
-    "gemini-3.5-flash",
+    "gemini-3.6-flash",
     "gemini-3.5-flash-lite",
     "gemini-flash-latest",
     "gemini-flash-lite-latest",
