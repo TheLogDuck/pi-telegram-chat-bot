@@ -5,7 +5,7 @@ A production-grade, asynchronous AI assistant engineered for resource-constraine
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![Telegram Bot API](https://img.shields.io/badge/telegram--bot--api-v20%2B%20async-blue.svg)](https://python-telegram-bot.org/)
 [![Memory Footprint](https://img.shields.io/badge/memory%20footprint-~53%20MB%20RAM-success.svg)](https://github.com/)
-[![Test Suite](https://img.shields.io/badge/tests-78%20passed-brightgreen.svg)](https://pytest.org/)
+[![Test Suite](https://img.shields.io/badge/tests-135%20passed-brightgreen.svg)](https://pytest.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ---
@@ -122,7 +122,7 @@ sequenceDiagram
 | **CPU Usage** | < 1% idle, < 15% peak during active generation | Offloads compute-heavy inference to cloud API via async I/O. |
 | **Database Engine** | SQLite 3 (`bot_memory.db`) with Write-Ahead Logging (`WAL`) | Near-zero RAM footprint, crash-resilient, concurrent readers. |
 | **Storage Footprint** | ~30 MB application + virtual environment | Fits easily within constrained SD storage allocations. |
-| **Unit Test Coverage** | **78 automated test cases** (100% offline mocked, ~2.0s execution) | Tests business logic, error traps, DB concurrency, and LLM retry cascades. |
+| **Unit Test Coverage** | **135 automated test cases** (100% offline mocked, ~2.0s execution) | Tests business logic, error traps, DB concurrency, and LLM retry cascades. |
 | **Network Architecture** | Long-polling outbound HTTPS (Telegram API) + Tailscale Mesh VPN | Bypasses dorm NAT firewalls without port forwarding or webhooks. |
 
 ---
@@ -169,6 +169,16 @@ sequenceDiagram
 - When an unauthorized entity addresses the bot, the administrator receives a Telegram alert with interactive `[Схвалити]` and `[Відхилити]` inline buttons.
 - Features sub-microsecond in-memory caching and SQLite persistence in the `access_grants` table.
 
+### 9. Dynamic Persona Customization (`/persona`)
+- Customizes conversational tone and demeanor (e.g., standard assistant, sarcastic "Meme Lord") via interactive Telegram inline keyboards or direct command arguments.
+- User preferences persist in SQLite (`user_personas` table) and dynamically format system prompts for conversations, roasts, and image generation.
+- Operates with zero memory overhead using Python dictionary lookups and isolated database storage.
+
+### 10. AI-Driven Emotional Reactions (`/switch_reaction`)
+- Uses ultra-lightweight models (`gemini-3.5-flash-lite`) to evaluate incoming chat context and attach relevant Telegram emoji reactions.
+- Controlled via an administrator-only toggle per chat (`/switch_reaction [chat_id]`) persisted in SQLite (`chat_reaction_settings`) to prevent spam and protect API quotas.
+- Runs non-blockingly without delaying the primary message processing loop.
+
 ---
 
 ## Getting Started
@@ -214,7 +224,7 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 ADMIN_CHAT_ID=your_numeric_chat_id_here
 
 # LLM Credentials
-GEMINI_TOKEN_KEY=your_gemini_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
 
 # Runtime Parameters
 LOG_LEVEL=INFO
@@ -229,7 +239,7 @@ Run the comprehensive test suite to confirm complete local readiness:
 ```bash
 pytest
 ```
-*Expected: 78 passed tests in approximately 2 seconds.*
+*Expected: 135 passed tests in approximately 2 seconds.*
 
 ### 6. Run the Application
 ```bash
@@ -318,5 +328,5 @@ To eliminate Telegram `409 Conflict` errors caused by concurrent long-polling lo
 
 ## Testing Strategy
 
-- **Unit Testing (78 tests):** All components (database queries, logging, intent parsing, error handling, token math, command routing) are tested offline with zero external network calls. Telegram and Gemini APIs are fully mocked with `unittest.mock`.
+- **Unit Testing (135 tests):** All components (database queries, logging, intent parsing, error handling, token math, command routing) are tested offline with zero external network calls. Telegram and Gemini APIs are fully mocked with `unittest.mock`.
 - **End-to-End Synthetic Testing (`tests/e2e_tester.py`):** Features a headless test runner bot client (`TEST_RUNNER_BOT_TOKEN`) that fires synthetic user messages into a designated test group (`TEST_GROUP_CHAT_ID`) to validate live bot responses before merging to production.
