@@ -4,6 +4,9 @@ python-telegram-bot==22.8
 # Lightweight Google Gemini API client
 google-genai==2.28.0
 
+# Non-blocking async HTTP client for external APIs and GCP REST endpoints
+httpx==0.28.1
+
 # Secret and configuration management via .env
 python-dotenv==1.2.4
 

@@ -4,7 +4,9 @@ import os
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
+from typing import Optional
 from core.database.telemetry import async_get_token_usage_stats
+from core.gcp import GCPTelemetryReport, get_gcp_telemetry
 from core.logger import setup_logger
 
 logger = setup_logger("analytics")
@@ -30,7 +32,7 @@ def is_owner(update: Update) -> bool:
     return str(update.effective_user.id) == str(admin_id).strip()
 
 
-def format_stats_report(stats: dict) -> str:
+def format_stats_report(stats: dict, gcp_report: Optional[GCPTelemetryReport] = None) -> str:
     """Renders usage data into a clean, readable text report in Ukrainian."""
     today = stats.get("today", {})
     total = stats.get("total", {})
@@ -43,7 +45,7 @@ def format_stats_report(stats: dict) -> str:
         f"  - Запитів: {today.get('calls', 0)}",
         f"  - Токенів: {today.get('total_tokens', 0):,} (Вхід: {today.get('prompt_tokens', 0):,} | Вихід: {today.get('completion_tokens', 0):,})",
         f"  - Орієнтовна вартість: ${today.get('cost_usd', 0.0):.4f}\n",
-        "<b>За весь час:</b>",
+        "<b>За весь час (Локальний підрахунок):</b>",
         f"  - Запитів: {total.get('calls', 0)}",
         f"  - Токенів: {total.get('total_tokens', 0):,}",
         f"  - Орієнтовна вартість: ${total.get('cost_usd', 0.0):.4f}\n",
@@ -56,6 +58,29 @@ def format_stats_report(stats: dict) -> str:
             lines.append(
                 f"  - {label}: {data.get('calls', 0)} запитів | "
                 f"{data.get('tokens', 0):,} токенів (${data.get('cost_usd', 0.0):.4f})"
+            )
+        lines.append("")
+
+    if gcp_report and gcp_report.is_available:
+        lines.append("<b>Офіційні дані Google Cloud (GCP):</b>")
+        if gcp_report.billing:
+            if gcp_report.billing.status == "synced":
+                lines.append(
+                    f"  - Фактичні витрати (MTD): ${gcp_report.billing.cost_usd:.4f} {gcp_report.billing.currency}"
+                )
+            elif gcp_report.billing.status == "pending_first_export":
+                lines.append("  - Фактичні витрати (MTD): Очікується перший експорт BigQuery (~1-2 год)")
+            elif gcp_report.billing.status == "unconfigured":
+                lines.append("  - Фактичні витрати (MTD): BigQuery таблиця не налаштована")
+
+        if gcp_report.quotas:
+            lines.append("  - Ліміти квот (Cloud Quotas):")
+            for q in gcp_report.quotas:
+                lines.append(f"    • {q.metric_name}: {q.limit:,.0f} {q.unit}")
+
+        if gcp_report.usage:
+            lines.append(
+                f"  - Поточна швидкість (Monitoring): {gcp_report.usage.current_rate_usage:.2f} req/min"
             )
         lines.append("")
 
@@ -81,7 +106,10 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # Retrieve aggregated token and dollar metrics from local SQLite
     stats = await async_get_token_usage_stats()
 
-    report_text = format_stats_report(stats)
+    # Retrieve official Google Cloud telemetry (quotas, monitoring, and actual spend)
+    gcp_report = await get_gcp_telemetry()
+
+    report_text = format_stats_report(stats, gcp_report)
     await update.effective_message.reply_text(
         report_text,
         parse_mode=ParseMode.HTML,

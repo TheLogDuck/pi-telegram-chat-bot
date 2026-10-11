@@ -37,3 +37,6 @@ logs/
 
 # Private operational runbooks
 INFRASTRUCTURE.md
+
+# GCP Infrastructure
+gcp_service_account*.json
