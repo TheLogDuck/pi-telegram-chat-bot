@@ -38,8 +38,8 @@ def test_format_language_selection_text() -> None:
     assert "Русский" in text_ru
 
 
-def test_language_command_with_direct_argument() -> None:
-    """Verifies that passing an argument like '/lang ru' immediately sets the language."""
+def test_language_command_ignores_arguments_and_shows_menu() -> None:
+    """Verifies that passing arguments like '/lang ru' still shows the interactive menu."""
     mock_update = MagicMock()
     mock_message = AsyncMock()
     mock_update.effective_message = mock_message
@@ -48,13 +48,16 @@ def test_language_command_with_direct_argument() -> None:
     mock_context = MagicMock()
     mock_context.args = ["ru"]
 
-    with patch("modules.language.async_set_chat_language", new_callable=AsyncMock) as mock_set:
+    with patch("modules.language.async_get_chat_language", new_callable=AsyncMock, return_value="uk") as mock_get, \
+         patch("modules.language.async_set_chat_language", new_callable=AsyncMock) as mock_set:
         asyncio.run(language_command(mock_update, mock_context))
 
-        mock_set.assert_awaited_once_with(-100123, "ru")
+        mock_set.assert_not_called()
+        mock_get.assert_awaited_once_with(-100123)
         mock_message.reply_text.assert_awaited_once()
-        sent_text = mock_message.reply_text.call_args[0][0]
-        assert "Русский" in sent_text
+        kwargs = mock_message.reply_text.call_args.kwargs
+        assert kwargs["reply_markup"] is not None
+        assert kwargs["parse_mode"] == ParseMode.HTML
 
 
 def test_language_command_without_arguments_shows_menu() -> None:

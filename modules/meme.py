@@ -74,9 +74,9 @@ async def meme_command(
         photo_stream.name = "meme.png"
         escaped_prompt = html.escape(target_prompt)
         caption = (
-            f"<b>Мем:</b> {escaped_prompt}\n\n<b>Модель:</b> {html.escape(model_used)}"
+            f"{escaped_prompt}\n\n<b>Модель:</b> {html.escape(model_used)}"
             if model_used
-            else f"<b>Мем:</b> {escaped_prompt}"
+            else escaped_prompt
         )
         await message.reply_photo(
             photo=photo_stream,

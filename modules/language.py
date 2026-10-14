@@ -44,50 +44,13 @@ def format_language_selection_text(lang_code: str) -> str:
 
 
 async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles the /lang slash command to view or switch the chat's language."""
+    """Handles the /lang slash command to display the interactive button menu."""
     message = update.effective_message
     chat = update.effective_chat
     if not message or not chat:
         return
 
-    # Check if a specific language code was passed directly as an argument (e.g., /lang ru)
-    if context.args:
-        requested = context.args[0].strip().lower()
-        # Map common aliases
-        alias_map = {
-            "ua": "uk",
-            "ukr": "uk",
-            "ukrainian": "uk",
-            "українська": "uk",
-            "ru": "ru",
-            "rus": "ru",
-            "russian": "ru",
-            "русский": "ru",
-            "en": "en",
-            "eng": "en",
-            "english": "en",
-            "англійська": "en",
-            "английский": "en",
-            "de": "de",
-            "ger": "de",
-            "deutsch": "de",
-            "german": "de",
-            "німецька": "de",
-            "немецкий": "de",
-        }
-        target_code = alias_map.get(requested, requested)
-
-        if is_supported_language(target_code):
-            await async_set_chat_language(chat.id, target_code)
-            lang_name = SUPPORTED_LANGUAGES[target_code]
-            success_msg = get_localized_string("language_switched_success", target_code)
-            await message.reply_text(
-                f"<b>{success_msg} {lang_name}.</b>",
-                parse_mode=ParseMode.HTML,
-            )
-            return
-
-    # Default interactive flow: retrieve current chat language and display inline buttons
+    # Retrieve current chat language and display inline button menu
     current_code = await async_get_chat_language(chat.id)
     text = format_language_selection_text(current_code)
     keyboard = build_language_keyboard(current_code)
