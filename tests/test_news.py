@@ -21,6 +21,7 @@ def make_news_update(text: str = "/news") -> MagicMock:
 
     update.effective_chat = chat
     update.effective_message = message
+    update.effective_user = None
     return update
 
 
@@ -39,7 +40,12 @@ def test_news_command_with_explicit_topic(mock_generate: AsyncMock) -> None:
         chat_id=12345,
         action=ChatAction.TYPING,
     )
-    mock_generate.assert_awaited_once_with(topic="штучний інтелект")
+    mock_generate.assert_awaited_once_with(
+        topic="штучний інтелект",
+        chat_id=12345,
+        user_id=None,
+        language="uk",
+    )
     update.effective_message.reply_text.assert_awaited_once_with(
         "1. Новини штучного інтелекту...\n\nМодель: gemini-3.8-flash",
         parse_mode=ParseMode.HTML,
@@ -57,7 +63,12 @@ def test_news_command_with_context_args(mock_generate: AsyncMock) -> None:
 
     asyncio.run(news_command(update, context))
 
-    mock_generate.assert_awaited_once_with(topic="space tech")
+    mock_generate.assert_awaited_once_with(
+        topic="space tech",
+        chat_id=12345,
+        user_id=None,
+        language="uk",
+    )
     update.effective_message.reply_text.assert_awaited_once_with(
         "1. Новини космосу...\n\nМодель: gemini-3.8-flash",
         parse_mode=ParseMode.HTML,
@@ -75,7 +86,12 @@ def test_news_command_default_headlines(mock_generate: AsyncMock) -> None:
 
     asyncio.run(news_command(update, context))
 
-    mock_generate.assert_awaited_once_with(topic=None)
+    mock_generate.assert_awaited_once_with(
+        topic=None,
+        chat_id=12345,
+        user_id=None,
+        language="uk",
+    )
     update.effective_message.reply_text.assert_awaited_once_with(
         "1. Головні новини...\n\nМодель: gemini-3.8-flash",
         parse_mode=ParseMode.HTML,

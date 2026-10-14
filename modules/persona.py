@@ -3,6 +3,7 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
+from core.database.languages import async_get_chat_language
 from core.database.personas import async_get_user_persona, async_set_user_persona
 from core.logger import setup_logger
 from core.personas import PERSONA_REGISTRY, get_persona
@@ -12,20 +13,55 @@ logger = setup_logger("persona")
 CALLBACK_PREFIX = "persona:set:"
 
 
-def build_persona_keyboard(current_key: str) -> InlineKeyboardMarkup:
+def build_persona_keyboard(current_key: str, lang_code: str = "uk") -> InlineKeyboardMarkup:
     """Builds an inline keyboard with available personas, marking the active one."""
+    tag = "[Обрано]"
+    if lang_code == "ru":
+        tag = "[Выбрано]"
+    elif lang_code == "en":
+        tag = "[Selected]"
+    elif lang_code == "de":
+        tag = "[Ausgewählt]"
+
     keyboard = []
     for key, persona in PERSONA_REGISTRY.items():
         # Text label indicates the active persona without using any emojis
-        label = f"[Обрано] {persona.name}" if key == current_key else persona.name
+        label = f"{tag} {persona.name}" if key == current_key else persona.name
         callback_data = f"{CALLBACK_PREFIX}{key}"
         keyboard.append([InlineKeyboardButton(label, callback_data=callback_data)])
     return InlineKeyboardMarkup(keyboard)
 
 
-def format_persona_selection_text(persona_key: str) -> str:
-    """Formats the explanation text with current persona details."""
+def format_persona_selection_text(persona_key: str, lang_code: str = "uk") -> str:
+    """Formats the explanation text with current persona details in the chat's language."""
     persona = get_persona(persona_key)
+    if lang_code == "ru":
+        return (
+            "<b>Выбор стиля общения бота:</b>\n\n"
+            f"Текущая персона: <b>{persona.name}</b>\n"
+            f"<i>{persona.description}</i>\n\n"
+            "Этот стиль применяется для ваших диалогов, прожарок (/roast) и генерации мемов (/meme) "
+            "как в личных сообщениях, так и в групповых чатах.\n\n"
+            "Нажмите кнопку ниже, чтобы изменить персону:"
+        )
+    elif lang_code == "en":
+        return (
+            "<b>Bot communication style selection:</b>\n\n"
+            f"Current persona: <b>{persona.name}</b>\n"
+            f"<i>{persona.description}</i>\n\n"
+            "This style applies to all dialogues, roasts (/roast), and meme generation (/meme) "
+            "both in private messages and group chats.\n\n"
+            "Click a button below to change persona:"
+        )
+    elif lang_code == "de":
+        return (
+            "<b>Auswahl des Kommunikationsstils des Bots:</b>\n\n"
+            f"Aktuelle Persona: <b>{persona.name}</b>\n"
+            f"<i>{persona.description}</i>\n\n"
+            "Dieser Stil gilt für Ihre Dialoge, Roasts (/roast) und Meme-Generierung (/meme) "
+            "sowohl in privaten Nachrichten als auch in Gruppen-Chats.\n\n"
+            "Klicken Sie unten, um die Persona zu ändern:"
+        )
     return (
         "<b>Вибір стилю спілкування бота:</b>\n\n"
         f"Поточна персона: <b>{persona.name}</b>\n"
@@ -62,10 +98,12 @@ async def persona_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
             return
 
-    # Default flow: retrieve current persona and display interactive inline buttons
+    # Default flow: retrieve current persona and display interactive inline buttons in chat's language
     current_key = await async_get_user_persona(user.id)
-    text = format_persona_selection_text(current_key)
-    keyboard = build_persona_keyboard(current_key)
+    chat = update.effective_chat
+    lang_code = await async_get_chat_language(chat.id) if chat else "uk"
+    text = format_persona_selection_text(current_key, lang_code=lang_code)
+    keyboard = build_persona_keyboard(current_key, lang_code=lang_code)
 
     await message.reply_text(
         text,
@@ -98,9 +136,11 @@ async def persona_callback_query(update: Update, context: ContextTypes.DEFAULT_T
     # Acknowledge the callback query to dismiss loading animation in Telegram UI
     await query.answer(f"Обрано: {selected_persona.name}")
 
-    # Update message text and refresh buttons to reflect the new selection
-    text = format_persona_selection_text(target_key)
-    keyboard = build_persona_keyboard(target_key)
+    # Update message text and refresh buttons to reflect the new selection in chat's language
+    chat = update.effective_chat
+    lang_code = await async_get_chat_language(chat.id) if chat else "uk"
+    text = format_persona_selection_text(target_key, lang_code=lang_code)
+    keyboard = build_persona_keyboard(target_key, lang_code=lang_code)
 
     try:
         await query.edit_message_text(

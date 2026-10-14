@@ -73,6 +73,7 @@ def test_roast_command_with_explicit_arg(
         chat_id=12345,
         user_id=777,
         persona_key="standard",
+        language="uk",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
         "<b>Роаст @developer:</b> Забагато кави!\n\nМодель: gemini-3.8-flash",
@@ -113,6 +114,7 @@ def test_roast_command_from_reply_message(
         chat_id=12345,
         user_id=777,
         persona_key="standard",
+        language="uk",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
         "<b>Роаст @victim:</b> Привіт жертві!\n\nМодель: gemini-3.8-flash",
@@ -177,6 +179,7 @@ def test_roast_command_reply_to_bot_injects_message_text(
         chat_id=12345,
         user_id=777,
         persona_key="standard",
+        language="uk",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
         "<b>Роаст @OtherBot:</b> Смішний жарт!\n\nМодель: gemini-3.8-flash",

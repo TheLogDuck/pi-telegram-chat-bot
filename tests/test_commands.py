@@ -127,3 +127,28 @@ def test_set_bot_commands(monkeypatch) -> None:
     assert mock_app.bot.set_my_commands.await_count == 2
 
 
+def test_commands_localized_language() -> None:
+    """Verifies that /start, /help, and /ping output in Russian when chat language is ru."""
+    mock_update = make_mock_update()
+    mock_update.effective_chat = MagicMock(id=-100888)
+    mock_update.effective_user.id = 55555
+    mock_context = MagicMock()
+
+    with patch("modules.commands.async_get_chat_language", new_callable=AsyncMock, return_value="ru"):
+        # Test /start in Russian
+        asyncio.run(start_command(mock_update, mock_context))
+        call_text = mock_update.effective_message.reply_text.call_args[0][0]
+        assert "Приветствую!" in call_text
+
+        # Test /ping in Russian
+        asyncio.run(ping_command(mock_update, mock_context))
+        call_text = mock_update.effective_message.reply_text.call_args[0][0]
+        assert "Бот активен и работает на Raspberry Pi." in call_text
+
+        # Test /help in Russian
+        asyncio.run(help_command(mock_update, mock_context))
+        call_text = mock_update.effective_message.reply_text.call_args[0][0]
+        assert "Справка по командам" in call_text
+
+
+

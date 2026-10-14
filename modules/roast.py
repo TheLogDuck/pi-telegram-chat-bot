@@ -4,8 +4,10 @@ from typing import Optional
 from telegram import Update
 from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
+from core.database.languages import async_get_chat_language
 from core.database.messages import async_get_user_messages
 from core.database.personas import async_get_user_persona
+from core.languages import get_localized_string
 from core.llm import generate_roast
 from core.logger import setup_logger
 from core.telegram_utils import format_reply_with_model, is_bot_mentioned, send_formatted_reply
@@ -48,9 +50,11 @@ async def roast_command(
         target_user_id = replied_user.id
         target_name = replied_user.username or replied_user.first_name
 
-    # If no target could be determined, explain how to use the command
+    # If no target could be determined, explain how to use the command in chat's language
     if not target_name:
-        await message.reply_text(NO_TARGET_HELP_TEXT, parse_mode=ParseMode.HTML)
+        chat_lang = await async_get_chat_language(chat.id)
+        help_text = get_localized_string("no_target_roast_help", chat_lang)
+        await message.reply_text(help_text, parse_mode=ParseMode.HTML)
         return
 
     # In group chats, ensure bot speaks only when tagged
@@ -83,9 +87,10 @@ async def roast_command(
             if not context_messages or replied_quote not in context_messages:
                 context_messages = [replied_quote] + (context_messages or [])
 
-    # Step 3: Fetch caller persona and generate Ukrainian standup roast
+    # Step 3: Fetch caller persona, chat language, and generate standup roast
     caller_id = update.effective_user.id if update.effective_user else None
     persona_key = await async_get_user_persona(caller_id) if caller_id else "standard"
+    chat_lang = await async_get_chat_language(chat.id)
 
     result = await generate_roast(
         target_name=target_name,
@@ -93,6 +98,7 @@ async def roast_command(
         chat_id=chat.id,
         user_id=caller_id,
         persona_key=persona_key,
+        language=chat_lang,
     )
     if isinstance(result, tuple):
         roast_text, model_used = result

@@ -44,6 +44,12 @@ from .reactions import (
     set_reaction_enabled,
     toggle_reaction_enabled,
 )
+from .languages import (
+    async_get_chat_language,
+    async_set_chat_language,
+    get_chat_language,
+    set_chat_language,
+)
 from .telemetry import (
     async_get_token_usage_stats,
     async_save_token_usage,
@@ -52,6 +58,12 @@ from .telemetry import (
 )
 
 __all__ = [
+    # Languages
+    "async_get_chat_language",
+    "async_set_chat_language",
+    "get_chat_language",
+    "set_chat_language",
+
     # Connection
     "DEFAULT_DB_PATH",
     "DEFAULT_RETENTION_DAYS",

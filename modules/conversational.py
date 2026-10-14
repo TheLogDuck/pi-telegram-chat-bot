@@ -5,7 +5,9 @@ from typing import Optional
 from telegram import Update
 from telegram.constants import ChatAction, ChatType, ParseMode
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
+from core.database.languages import async_get_chat_language
 from core.database.personas import async_get_user_persona
+from core.languages import get_localized_string
 from core.llm import generate_response
 from core.logger import setup_logger
 from modules.analytics import stats_command
@@ -55,10 +57,12 @@ async def conversational_chat_handler(
     # Remove the tag from the prompt so Gemini receives clean context
     cleaned_prompt = clean_bot_mention(message.text, bot_username)
 
-    # If the user only tagged the bot without asking anything, greet them
+    # If the user only tagged the bot without asking anything, greet them in chat's language
     if not cleaned_prompt:
+        lang = await async_get_chat_language(chat.id)
+        tag_text = get_localized_string("empty_tag_prompt", lang)
         await message.reply_text(
-            EMPTY_TAG_PROMPT,
+            tag_text,
             parse_mode=ParseMode.HTML,
         )
         return
@@ -88,6 +92,10 @@ async def conversational_chat_handler(
     elif intent_result.intent == IntentType.PERSONA:
         await persona_command(update, context)
         return
+    elif intent_result.intent == IntentType.LANGUAGE:
+        from modules.language import language_command
+        await language_command(update, context)
+        return
 
     # Inform the user that Gemini is processing their response
     try:
@@ -99,16 +107,18 @@ async def conversational_chat_handler(
         # Non-critical warning if typing action fails (e.g. transient network hiccup)
         logger.warning(f"Failed to send typing chat action: {exc}")
 
-    # Extract caller user ID to look up their chosen persona
+    # Extract caller user ID to look up their chosen persona and chat language
     user_id = message.from_user.id if message.from_user else None
     persona_key = await async_get_user_persona(user_id) if user_id else "standard"
+    language = await async_get_chat_language(chat.id)
 
-    # Generate response via the non-blocking Gemini wrapper with user's persona
+    # Generate response via the non-blocking Gemini wrapper with user's persona and language
     result = await generate_response(
         cleaned_prompt,
         chat_id=chat.id,
         user_id=user_id,
         persona_key=persona_key,
+        language=language,
     )
     if isinstance(result, tuple):
         ai_response, model_used = result

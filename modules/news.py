@@ -4,6 +4,7 @@ from typing import Optional
 from telegram import Update
 from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
+from core.database.languages import async_get_chat_language
 from core.llm import generate_news_briefing
 from core.logger import setup_logger
 from core.telegram_utils import format_reply_with_model, is_bot_mentioned, send_formatted_reply
@@ -46,8 +47,19 @@ async def news_command(
     except Exception as exc:
         logger.warning(f"Failed to send typing action for news briefing: {exc}")
 
-    # Generate the grounded briefing via the non-blocking Gemini wrapper
-    result = await generate_news_briefing(topic=topic)
+    # Generate the grounded briefing via the non-blocking Gemini wrapper in the chat's language
+    chat_lang = await async_get_chat_language(chat.id)
+    user_id = (
+        update.effective_user.id
+        if update.effective_user and isinstance(update.effective_user.id, int)
+        else None
+    )
+    result = await generate_news_briefing(
+        topic=topic,
+        chat_id=chat.id,
+        user_id=user_id,
+        language=chat_lang,
+    )
     if isinstance(result, tuple):
         briefing, model_used = result
     else:

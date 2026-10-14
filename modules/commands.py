@@ -3,6 +3,8 @@ import os
 from telegram import BotCommand, BotCommandScopeChat, BotCommandScopeDefault, Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
+from core.database.languages import async_get_chat_language
+from core.languages import get_localized_string
 from core.logger import setup_logger
 from modules.access_control import is_admin
 
@@ -31,6 +33,7 @@ PUBLIC_HELP_TEXT = (
     "• <code>/meme [опис]</code> — Генерація зображення або мему через ШІ (Nano Banana).\n"
     "  <i>Приклад:</i> <code>/meme кіт програміст лагодить сервер</code>.\n"
     "• <code>/persona</code> — Обрати стиль/персону спілкування бота (стандартний або мем-лорд).\n"
+    "• <code>/lang</code> — Обрати мову спілкування бота для цього чату (UA, RU, EN, DE).\n"
     "• <b>Спілкування з ШІ:</b>\n"
     "  В особистих чатах пишіть будь-що напряму, а в групах — згадуйте через тег або reply."
 )
@@ -51,20 +54,29 @@ PING_TEXT = "<b>Понг!</b> Бот активний і працює на Raspb
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Sends a greeting when /start is issued."""
+    """Sends a greeting when /start is issued in the chat's active language."""
     if update.effective_message:
-        # Non-blocking async reply directly back to the source chat with HTML formatting
+        chat = update.effective_chat
+        lang = await async_get_chat_language(chat.id) if chat else "uk"
+        text = get_localized_string("start_text", lang)
         await update.effective_message.reply_text(
-            START_TEXT,
+            text,
             parse_mode=ParseMode.HTML,
         )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Sends the command directory when /help is issued, displaying admin tools only to owner."""
+    """Sends the command directory in the chat's active language, displaying admin tools only to owner."""
     if update.effective_message:
         user = update.effective_user
-        text = ADMIN_HELP_TEXT if user and is_admin(user.id) else PUBLIC_HELP_TEXT
+        chat = update.effective_chat
+        lang = await async_get_chat_language(chat.id) if chat else "uk"
+        is_admin_user = user and is_admin(user.id)
+
+        base_help = get_localized_string("public_help_text", lang)
+        admin_help = get_localized_string("admin_help_text", lang) if is_admin_user else ""
+        text = f"{base_help}{admin_help}"
+
         await update.effective_message.reply_text(
             text,
             parse_mode=ParseMode.HTML,
@@ -72,11 +84,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Replies immediately to verify the event loop is responsive."""
+    """Replies immediately in the chat's active language to verify the event loop is responsive."""
     if update.effective_message:
-        # Heartbeat check: zero disk or external API overhead
+        chat = update.effective_chat
+        lang = await async_get_chat_language(chat.id) if chat else "uk"
+        text = get_localized_string("ping_text", lang)
         await update.effective_message.reply_text(
-            PING_TEXT,
+            text,
             parse_mode=ParseMode.HTML,
         )
 
@@ -97,6 +111,7 @@ PUBLIC_BOT_COMMANDS = [
     BotCommand("roast", "Влаштувати дружній роаст користувача"),
     BotCommand("meme", "Згенерувати мем або зображення через ШІ"),
     BotCommand("persona", "Обрати стиль або персону спілкування"),
+    BotCommand("lang", "Обрати мову спілкування бота для чату"),
 ]
 BOT_COMMANDS = PUBLIC_BOT_COMMANDS
 

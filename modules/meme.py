@@ -5,7 +5,9 @@ from typing import Optional
 from telegram import Update
 from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
+from core.database.languages import async_get_chat_language
 from core.database.personas import async_get_user_persona
+from core.languages import get_localized_string
 from core.llm import generate_meme_image
 from core.logger import setup_logger
 
@@ -35,7 +37,9 @@ async def meme_command(
         target_prompt = " ".join(context.args).strip()
 
     if not target_prompt:
-        await message.reply_text(NO_PROMPT_MESSAGE, parse_mode=ParseMode.HTML)
+        chat_lang = await async_get_chat_language(chat.id)
+        msg = get_localized_string("no_prompt_meme_help", chat_lang)
+        await message.reply_text(msg, parse_mode=ParseMode.HTML)
         return
 
     # Inform the user that image synthesis is in progress

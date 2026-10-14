@@ -116,4 +116,16 @@ def init_db(db_path: Optional[str] = None) -> None:
             );
             """
         )
+
+        # Table for per-chat language configuration
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_languages (
+                chat_id INTEGER PRIMARY KEY,
+                language_code TEXT NOT NULL DEFAULT 'uk',
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
         conn.commit()
+
