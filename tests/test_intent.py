@@ -138,69 +138,100 @@ def test_detect_intent_fallback_to_chat() -> None:
     assert res_empty.intent == IntentType.CHAT
 
 
-def test_detect_intent_image_slang_ukrainian_and_russian() -> None:
-    """Verifies that Ukrainian and Russian slang and drawing verbs trigger MEME intent."""
-    # Ukrainian: намалюй
-    res1 = detect_intent("намалюй кота в капелюсі")
-    assert res1.intent == IntentType.MEME
-    assert res1.topic == "кота в капелюсі"
+def test_detect_intent_german_and_english_roast() -> None:
+    """Verifies English and German roast triggers, slang, and target extraction."""
+    # English: roast with target
+    res_en1 = detect_intent("roast @john")
+    assert res_en1.intent == IntentType.ROAST
+    assert res_en1.target_user == "@john"
 
-    # Ukrainian: запили пікчу
-    res2 = detect_intent("запили пікчу про програміста")
-    assert res2.intent == IntentType.MEME
-    assert res2.topic == "програміста"
+    # English: burn slang
+    res_en2 = detect_intent("burn @developer")
+    assert res_en2.intent == IntentType.ROAST
+    assert res_en2.target_user == "@developer"
 
-    # Ukrainian: збацай мемас
-    res3 = detect_intent("збацай мемас як кіт ламає прод")
-    assert res3.intent == IntentType.MEME
-    assert res3.topic == "кіт ламає прод"
+    # English: diss slang
+    res_en3 = detect_intent("diss @sam")
+    assert res_en3.intent == IntentType.ROAST
+    assert res_en3.target_user == "@sam"
 
-    # Russian: нарисуй
-    res4 = detect_intent("нарисуй собаку на скейте")
-    assert res4.intent == IntentType.MEME
-    assert res4.topic == "собаку на скейте"
+    # English: self-referential roast me
+    res_en4 = detect_intent("roast me please")
+    assert res_en4.intent == IntentType.ROAST
+    assert res_en4.target_user == "@me"
 
-    # Russian: сделай фотожабу
-    res5 = detect_intent("сделай фотожабу про дедлайн")
-    assert res5.intent == IntentType.MEME
-    assert res5.topic == "дедлайн"
+    # German: roaste with target
+    res_de1 = detect_intent("roaste @klaus")
+    assert res_de1.intent == IntentType.ROAST
+    assert res_de1.target_user == "@klaus"
 
-    # Russian: пикча
-    res6 = detect_intent("пикча космического корабля")
-    assert res6.intent == IntentType.MEME
-    assert res6.topic == "космического корабля"
+    # German: zerlege slang
+    res_de2 = detect_intent("zerlege @klaus")
+    assert res_de2.intent == IntentType.ROAST
+    assert res_de2.target_user == "@klaus"
 
-    # Ukrainian: згенеруй картинку
-    res7 = detect_intent("згенеруй картинку захід сонця")
-    assert res7.intent == IntentType.MEME
-    assert res7.topic == "захід сонця"
-
-
-def test_detect_intent_roast_slang_ukrainian_and_russian() -> None:
-    """Verifies colloquial Ukrainian and Russian roast slang and target extraction."""
-    # Ukrainian: рознеси
-    res1 = detect_intent("рознеси @taras")
-    assert res1.intent == IntentType.ROAST
-    assert res1.target_user == "@taras"
-
-    # Ukrainian: постібися над @user (skips preposition 'над')
-    res2 = detect_intent("постібися над @taras")
-    assert res2.intent == IntentType.ROAST
-    assert res2.target_user == "@taras"
-
-    # Ukrainian: підколи олега
-    res3 = detect_intent("підколи олега")
-    assert res3.intent == IntentType.ROAST
-    assert res3.target_user == "@олега"
-
-    # Russian: постебись над @ivan
-    res4 = detect_intent("постебись над @ivan")
-    assert res4.intent == IntentType.ROAST
-    assert res4.target_user == "@ivan"
-
-    # Russian: затролль
-    res5 = detect_intent("затролль @ivan")
-    assert res5.intent == IntentType.ROAST
-    assert res5.target_user == "@ivan"
+    # German: verspotten with preposition skip
+    res_de3 = detect_intent("verspotte über @klaus")
+    assert res_de3.intent == IntentType.ROAST
+    assert res_de3.target_user == "@klaus"
 
 
+def test_detect_intent_german_and_english_meme() -> None:
+    """Verifies English and German meme creation triggers and prompt cleaning."""
+    # German: generiere einen meme über katze
+    res_de1 = detect_intent("generiere einen meme über katze")
+    assert res_de1.intent == IntentType.MEME
+    assert res_de1.topic == "katze"
+
+    # German: zeichne ein bild von weltall
+    res_de2 = detect_intent("zeichne ein bild von weltall")
+    assert res_de2.intent == IntentType.MEME
+    assert res_de2.topic == "weltall"
+
+    # English: make a meme about funny cats
+    res_en1 = detect_intent("make a meme about funny cats")
+    assert res_en1.intent == IntentType.MEME
+    assert res_en1.topic == "funny cats"
+
+    # English: draw a picture of a rocket
+    res_en2 = detect_intent("draw a picture of rocket")
+    assert res_en2.intent == IntentType.MEME
+    assert res_en2.topic == "rocket"
+
+
+def test_detect_intent_slang_ukrainian_and_russian() -> None:
+    """Verifies Ukrainian and Russian slang triggers for roast and meme intents."""
+    # Ukrainian roast: рознеси
+    res_roast_uk = detect_intent("рознеси @taras")
+    assert res_roast_uk.intent == IntentType.ROAST
+    assert res_roast_uk.target_user == "@taras"
+
+    # Ukrainian roast: постібися над @user
+    res_roast_uk2 = detect_intent("постібися над @taras")
+    assert res_roast_uk2.intent == IntentType.ROAST
+    assert res_roast_uk2.target_user == "@taras"
+
+    # Russian roast: постебись над @ivan
+    res_roast_ru = detect_intent("постебись над @ivan")
+    assert res_roast_ru.intent == IntentType.ROAST
+    assert res_roast_ru.target_user == "@ivan"
+
+    # Ukrainian meme: намалюй кота в капелюсі
+    res_meme_uk = detect_intent("намалюй кота в капелюсі")
+    assert res_meme_uk.intent == IntentType.MEME
+    assert res_meme_uk.topic == "кота в капелюсі"
+
+    # Ukrainian meme: запили пікчу про програміста
+    res_meme_uk2 = detect_intent("запили пікчу про програміста")
+    assert res_meme_uk2.intent == IntentType.MEME
+    assert res_meme_uk2.topic == "програміста"
+
+    # Russian meme: нарисуй собаку на скейте
+    res_meme_ru = detect_intent("нарисуй собаку на скейте")
+    assert res_meme_ru.intent == IntentType.MEME
+    assert res_meme_ru.topic == "собаку на скейте"
+
+    # Russian meme: сделай фотожабу про дедлайн
+    res_meme_ru2 = detect_intent("сделай фотожабу про дедлайн")
+    assert res_meme_ru2.intent == IntentType.MEME
+    assert res_meme_ru2.topic == "дедлайн"

@@ -50,6 +50,12 @@ async def roast_command(
         target_user_id = replied_user.id
         target_name = replied_user.username or replied_user.first_name
 
+    # If the target is self-referential (e.g. "roast me", "просмаж мене", "roaste mich")
+    if target_name and target_name.lower().lstrip("@") in ("me", "мене", "меня", "mich", "mir"):
+        if update.effective_user:
+            target_user_id = update.effective_user.id
+            target_name = update.effective_user.username or update.effective_user.first_name
+
     # If no target could be determined, explain how to use the command in chat's language
     if not target_name:
         chat_lang = await async_get_chat_language(chat.id)

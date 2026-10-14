@@ -34,24 +34,51 @@ class IntentResult:
 INTENT_KEYWORDS: Dict[IntentType, List[str]] = {
     IntentType.ROAST: [
         # Canonical slash & trigger
-        "roast",
+        "roast", "roasts", "roasted", "roasting", "roaster",
+        "burn", "burns", "burned", "burning",
+        "mock", "mocks", "mocking",
+        "diss", "disses", "dissed", "dissing",
+        "drag", "drags", "dragged", "dragging",
+        "flame", "flames", "flamed", "flaming",
+        "grill", "grills", "grilled", "grilling",
+        "cook", "cooks", "cooked", "cooking",
+        "destroy", "destroys", "shred", "insult", "insults", "ridicule",
+        # German roast triggers & colloquial slang
+        "roaste", "roasten", "roastest", "geroastet",
+        "röste", "rösten", "röstet", "geröstet",
+        "dissen", "diss", "disse", "disst", "gedisst",
+        "verspotten", "verspotte", "verspottet",
+        "fertigmachen", "zerlege", "zerlegen", "zerleg", "zerlegt",
+        "niedermachen", "beleidigen", "beleidige", "beleidigt",
+        "grillen", "grille", "braten", "brate",
         # Ukrainian canonical & colloquial slang
-        "просмаж", "просмажити", "просмажка", "просмажте", "підсмаж", "підсмажити",
-        "рознеси", "рознести", "рознос",
-        "постіби", "постібися", "постьоб", "стьоб", "стеб", "вистеби", "висмій", "висміяти",
-        "підколи", "підколоти", "підкол",
-        "затроль", "затролити", "потроль", "потролити", "тролінг",
+        "просмаж", "просмажити", "просмажка", "просмажте", "просмажуй",
+        "підсмаж", "підсмажити", "підсмажка", "підсмажуй",
+        "рознеси", "рознести", "рознос", "розноси", "рознесіть",
+        "постіби", "постібися", "постібись", "постьоб", "стьоб", "стеб",
+        "вистеби", "вистіби", "висмій", "висміяти", "висміюй", "поглузуй", "глузуй",
+        "підколи", "підколоти", "підкол", "підколюй", "підколіть",
+        "затроль", "затролити", "потроль", "потролити", "тролінг", "троль",
         "попусти", "попустити", "розвали", "розвалити", "розмаж", "розмазати",
-        "обісри", "захейти", "захейтити",
+        "обісри", "захейти", "захейтити", "закрінжуй", "закринжуй",
+        "спали", "спалити", "підпали", "підпалити", "спопели", "спопелити",
+        "зачмири", "зачмирити", "почмири", "зганьби", "зганьбити", "присороми",
+        "розірви", "розірвати",
         # Russian canonical & colloquial slang
-        "прожарь", "прожарить", "прожарка", "прожарьте", "поджарь", "поджарить",
+        "прожарь", "прожарить", "прожарка", "прожарьте",
+        "поджарь", "поджарить", "поджарьте",
         "роаст", "роасти", "роастить", "зароасти", "зароасть", "роастинг",
-        "разнеси", "разнести", "разнос",
-        "постеби", "постебись", "стеб", "стёб", "высмей", "высмеять",
-        "подколи", "подколоть", "подкол",
-        "затролль", "затроллить", "потролль", "потроллить", "троллинг",
-        "опусти", "опустить", "развали", "развалить", "размажь", "размазать",
-        "обосри", "обосрать",
+        "разнеси", "разнести", "разнос", "разнесите",
+        "постеби", "постебись", "стеб", "стёб", "выстеби",
+        "высмей", "высмеять", "высмеивать", "поглумись", "глумись",
+        "подколи", "подколоть", "подкол", "подколите", "подкалывать",
+        "затролль", "затроллить", "потролль", "потроллить", "троллинг", "тролль",
+        "опусти", "опустить", "опустите",
+        "развали", "развалить", "размажь", "размазать", "размажьте",
+        "обосри", "обосрать", "закринжуй",
+        "сожги", "сжечь", "испепели", "испепелить",
+        "зачмори", "зачморить", "почмори", "опозорь", "опозорить", "пристыди",
+        "разорви", "разорвать",
         # Common typos & phonetic variants
         "просмаш", "прожар", "зарости",
     ],
@@ -70,23 +97,39 @@ INTENT_KEYWORDS: Dict[IntentType, List[str]] = {
     ],
     IntentType.MEME: [
         # Canonical slash & trigger keyword
-        "meme",
+        "meme", "memes", "mem", "mems",
+        # English creation verbs & visual media
+        "pic", "pics", "picture", "pictures", "image", "images", "photo", "photos",
+        "draw", "drawing", "draws", "drawn", "generate", "create", "illustration", "illustrations",
+        "artwork", "sketch", "sketches", "comic", "comics", "render", "rendering",
+        "paint", "painting", "visualize", "caricature", "wallpaper",
+        # German creation verbs & visual media
+        "bild", "bilder", "foto", "fotos", "grafik", "grafiken", "zeichnung", "zeichnungen",
+        "generiere", "generieren", "erstelle", "erstellen", "erstell",
+        "zeichne", "zeichnen", "male", "malen", "gemalt",
+        "witzbild", "scherzbild", "lustiges", "karikatur", "karikaturen",
+        "skizze", "skizzen", "gemälde", "porträt", "portrait", "comic",
         # Ukrainian & Russian memes / humor slang
-        "мем", "меми", "мемчик", "мемчики", "мемас", "мемаси", "мемасик", "мемасики",
-        "мемес", "мемєс", "жаба", "жабу", "жабка", "жабку", "фотожаба", "фотожабу",
+        "мем", "меми", "мемы", "мемчик", "мемчики", "мемас", "мемаси", "мемасы", "мемасик", "мемасики",
+        "мемес", "мемєс", "жаба", "жабу", "жабка", "жабку", "фотожаба", "фотожабу", "фотожабы",
+        "демотиватор", "демотиватори", "демотиваторы", "демот", "демоти",
         # Visual media & art slang (Ukrainian & Russian)
         "картинка", "картинку", "картинки", "картиночка", "картиночку",
         "пікча", "пікчу", "пікчі", "пікчера", "пікчура",
         "пикча", "пикчу", "пикчи", "пикчер", "пикчера", "пикчура",
         "зображення", "зображ", "ілюстрація", "ілюстрацію", "иллюстрация", "иллюстрацию",
-        "арт", "арти", "артік", "артик", "артець", "артец",
+        "арт", "арти", "арты", "артік", "артик", "артець", "артец",
         "малюнок", "малюночок", "рисунок", "рисуночек",
-        "фото", "фотка", "фотку", "фоточка", "фоточку",
+        "фотка", "фотку", "фотки", "фоточка", "фоточку",
+        "комікс", "комікси", "комикс", "комиксы",
+        "карикатура", "карикатуру", "карикатури", "карикатуры", "шарж", "шаржи",
+        "скетч", "скетчі", "скетчи",
         # Drawing & generation action verbs / slang commands
         "намалюй", "намалювати", "змалюй", "змалювати", "нарисуй", "нарисовать",
         "згенеруй", "згенери", "згенерувати", "сгенерируй", "сгенери", "сгенерить",
         "запили", "збацай", "забацай", "замути", "сваргань", "зліпи", "налепи",
-        "наклепай", "накидай", "набросай", "изобрази", "відтвори",
+        "наклепай", "накидай", "набросай", "наваяй", "изобрази", "відтвори",
+        "відрендери", "отрендери", "візуалізуй", "визуализируй",
     ],
     IntentType.PERSONA: [
         "persona", "персона", "персони", "персону", "персонаж",
@@ -117,10 +160,16 @@ def extract_target_user(text: str) -> Optional[str]:
         if clean_token in INTENT_KEYWORDS[IntentType.ROAST]:
             for j in range(i + 1, len(tokens)):
                 candidate = tokens[j].strip("!?,.")
-                # Skip prepositions and courtesy words
+                # Skip prepositions, articles, and courtesy words across all supported languages
                 if candidate.lower() not in {
-                    "на", "про", "над", "about", "for",
-                    "цього", "этого", "цьому", "этому", "будь", "ласка", "пожалуйста", "пліз",
+                    # Ukrainian & Russian prepositions / conjunctions / courtesy words
+                    "на", "про", "над", "під", "под", "для", "з", "со", "за",
+                    "цього", "этого", "цьому", "этому", "будь", "ласка", "пожалуйста", "пліз", "плиз",
+                    # English prepositions, articles & courtesy words
+                    "about", "for", "against", "at", "the", "a", "an", "this", "that", "please",
+                    # German prepositions, articles & courtesy words
+                    "über", "uber", "fuer", "für", "auf", "an", "den", "die", "das", "dem", "des",
+                    "einen", "ein", "eine", "dieser", "diesen", "diesem", "dieses", "bitte",
                 }:
                     return f"@{candidate.lstrip('@')}"
     return None
@@ -134,7 +183,7 @@ def extract_news_topic(text: str, matched_trigger: str) -> Optional[str]:
 
     # Clean punctuation and iteratively strip common conversational filler words
     cleaned = remainder.strip("!?,. :")
-    filler_pattern = r"^(останні|останніх|свежие|последние|latest|the|про|о|об|about)\s+"
+    filler_pattern = r"^(останні|останніх|свежие|последние|latest|the|über|uber|про|о|об|about)\s+"
     while re.search(filler_pattern, cleaned, flags=re.IGNORECASE):
         cleaned = re.sub(filler_pattern, "", cleaned, flags=re.IGNORECASE).strip()
 
@@ -146,15 +195,28 @@ def extract_meme_prompt(text: str, matched_trigger: str) -> Optional[str]:
     pattern = rf"\b{re.escape(matched_trigger)}\b"
     remainder = re.sub(pattern, "", text, flags=re.IGNORECASE)
 
-    # Strip punctuation and common request prefixes in Ukrainian and Russian
+    # Strip punctuation and common request prefixes across Ukrainian, Russian, English, and German
     cleaned = remainder.strip("!?,. :")
     filler_pattern = (
         r"^(будь ласка|пліз|плиз|пожалуйста|мені|нам|мне|про|про те як|про те що|"
-        r"про то как|про то что|про те|про то|з|зі|со|с|на тему|як|как|"
+        r"про то как|про то что|про те|про то|з|зі|со|с|на тему|як|как|для|"
         r"зроби|сделай|покажи|намалюй|нарисуй|створи|создай|згенеруй|сгенерируй|"
-        r"запили|забацай|збацай|замути|сваргань|наклепай|набросай|"
-        r"картинку|картинка|пікчу|пікча|пикчу|пикча|арт|зображення|изображение|"
-        r"малюнок|рисунок|фото|фотку|фотожабу|жабу|мем|мемчик|мемас|мемасик)\s+"
+        r"запили|забацай|збацай|замути|сваргань|наклепай|набросай|наваяй|"
+        r"картинку|картинка|картинки|пікчу|пікча|пикчу|пикча|арт|зображення|изображение|"
+        r"малюнок|рисунок|фото|фотку|фотожабу|жабу|мем|меми|мемы|мемчик|мемас|мемасик|"
+        r"смішний|смішного|смешной|смешного|веселий|веселый|"
+        r"please|pls|make|generate|draw|create|show|give me|paint|render|"
+        r"a meme about|a meme of|meme about|meme of|a meme|meme|"
+        r"a picture of|picture of|a pic of|pic of|an image of|image of|a photo of|photo of|"
+        r"picture|pic|image|photo|comic|drawing|painting|"
+        r"about|of|for|with|a|an|the|"
+        r"bitte|generiere|erstelle|erstell|mach|mache|zeige|zeig|male|mal|zeichne|"
+        r"ein meme über|ein meme von|meme über|meme von|einen meme über|einen meme von|"
+        r"ein bild über|ein bild von|bild über|bild von|ein foto von|foto von|"
+        r"bild|bilder|foto|fotos|grafik|grafiken|zeichnung|zeichnungen|"
+        r"lustiges|lustige|lustigen|witziges|witzige|witzigen|"
+        r"ein|eine|einen|einem|einer|der|die|das|den|dem|des|"
+        r"über|von|fuer|für)\s+"
     )
     while re.search(filler_pattern, cleaned, flags=re.IGNORECASE):
         cleaned = re.sub(filler_pattern, "", cleaned, flags=re.IGNORECASE).strip("!?,. :")
