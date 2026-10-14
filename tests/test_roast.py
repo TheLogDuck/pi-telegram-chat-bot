@@ -76,7 +76,7 @@ def test_roast_command_with_explicit_arg(
         language="uk",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
-        "<b>Роаст @developer:</b> Забагато кави!\n\nМодель: gemini-3.8-flash",
+        "<b>Роаст @developer:</b> Забагато кави!\n\ngemini-3.8-flash",
         parse_mode=ParseMode.HTML,
     )
 
@@ -117,7 +117,7 @@ def test_roast_command_from_reply_message(
         language="uk",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
-        "<b>Роаст @victim:</b> Привіт жертві!\n\nМодель: gemini-3.8-flash",
+        "<b>Роаст @victim:</b> Привіт жертві!\n\ngemini-3.8-flash",
         parse_mode=ParseMode.HTML,
     )
 
@@ -182,6 +182,6 @@ def test_roast_command_reply_to_bot_injects_message_text(
         language="uk",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
-        "<b>Роаст @OtherBot:</b> Смішний жарт!\n\nМодель: gemini-3.8-flash",
+        "<b>Роаст @OtherBot:</b> Смішний жарт!\n\ngemini-3.8-flash",
         parse_mode=ParseMode.HTML,
     )

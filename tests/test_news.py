@@ -47,7 +47,7 @@ def test_news_command_with_explicit_topic(mock_generate: AsyncMock) -> None:
         language="uk",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
-        "1. Новини штучного інтелекту...\n\nМодель: gemini-3.8-flash",
+        "1. Новини штучного інтелекту...\n\ngemini-3.8-flash",
         parse_mode=ParseMode.HTML,
     )
 
@@ -70,7 +70,7 @@ def test_news_command_with_context_args(mock_generate: AsyncMock) -> None:
         language="uk",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
-        "1. Новини космосу...\n\nМодель: gemini-3.8-flash",
+        "1. Новини космосу...\n\ngemini-3.8-flash",
         parse_mode=ParseMode.HTML,
     )
 
@@ -93,7 +93,7 @@ def test_news_command_default_headlines(mock_generate: AsyncMock) -> None:
         language="uk",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
-        "1. Головні новини...\n\nМодель: gemini-3.8-flash",
+        "1. Головні новини...\n\ngemini-3.8-flash",
         parse_mode=ParseMode.HTML,
     )
 
