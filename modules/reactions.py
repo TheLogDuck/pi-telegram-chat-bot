@@ -40,9 +40,9 @@ async def switch_reaction_command(update: Update, context: ContextTypes.DEFAULT_
 
     new_state = await async_toggle_reaction_enabled(target_chat_id)
 
-    status_label = "УВІМКНЕНО" if new_state else "ВИМКНЕНО"
+    status_label = "ENABLED" if new_state else "DISABLED"
     await message.reply_text(
-        f"<b>Емоційні реакції:</b> {status_label} для чату <code>{target_chat_id}</code>.",
+        f"<b>Emotional reactions:</b> {status_label} for chat <code>{target_chat_id}</code>.",
         parse_mode=ParseMode.HTML,
     )
 

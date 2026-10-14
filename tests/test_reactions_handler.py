@@ -79,7 +79,7 @@ def test_switch_reaction_admin_toggles_group(
     mock_toggle.assert_awaited_once_with(-1001)
     update.effective_message.reply_text.assert_awaited_once()
     reply_args = update.effective_message.reply_text.await_args
-    assert "УВІМКНЕНО" in reply_args.args[0]
+    assert "ENABLED" in reply_args.args[0]
 
 
 @patch("modules.reactions.is_admin", return_value=True)
@@ -122,7 +122,7 @@ def test_switch_reaction_admin_specifies_chat_id_in_pm(
     mock_toggle.assert_awaited_once_with(-100223344)
     update.effective_message.reply_text.assert_awaited_once()
     reply_args = update.effective_message.reply_text.await_args
-    assert "ВИМКНЕНО" in reply_args.args[0]
+    assert "DISABLED" in reply_args.args[0]
 
 
 @patch("modules.reactions.async_is_reaction_enabled", new_callable=AsyncMock)

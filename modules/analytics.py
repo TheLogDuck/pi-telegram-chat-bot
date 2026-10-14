@@ -12,13 +12,13 @@ from core.logger import setup_logger
 
 logger = setup_logger("analytics")
 
-NON_OWNER_MESSAGE = "<b>Помилка доступу:</b> Ця команда доступна виключно адміністратору бота."
+NON_OWNER_MESSAGE = "<b>Access Denied:</b> This command is restricted to the bot administrator."
 
 FEATURE_LABELS = {
-    "chat": "Діалоги (Chat)",
-    "news": "Новини (News)",
-    "roast": "Прожарки (Roast)",
-    "meme": "Меми / Зображення (Nano Banana)",
+    "chat": "Chat Dialogs",
+    "news": "News Briefings",
+    "roast": "Standup Roasts",
+    "meme": "Memes / Images (Nano Banana)",
 }
 
 
@@ -34,17 +34,17 @@ def is_owner(update: Update) -> bool:
 
 
 def format_stats_report(stats: dict, gcp_report: Optional[GCPTelemetryReport] = None) -> str:
-    """Renders strictly official Google Cloud usage and billing telemetry report in Ukrainian."""
+    """Renders strictly official Google Cloud usage and billing telemetry report in English."""
     if not gcp_report or not gcp_report.is_available:
         return (
-            "<b>Статистика використання Gemini API (Google Cloud):</b>\n\n"
-            "Сервіс телеметрії GCP не налаштований або облікові дані відсутні.\n"
-            "Перевірте налаштування <code>GCP_PROJECT_ID</code> та <code>GCP_SERVICE_ACCOUNT_FILE</code> у .env."
+            "<b>Gemini API Usage Statistics (Google Cloud):</b>\n\n"
+            "GCP telemetry service is not configured or credentials are missing.\n"
+            "Check <code>GCP_PROJECT_ID</code> and <code>GCP_SERVICE_ACCOUNT_FILE</code> in .env."
         )
 
     lines = [
-        "<b>Статистика використання Gemini API (Google Cloud)</b>\n",
-        "<b>Сервіс:</b> Gemini API (<code>generativelanguage.googleapis.com</code>)\n",
+        "<b>Gemini API Usage Statistics (Google Cloud)</b>\n",
+        "<b>Service:</b> Gemini API (<code>generativelanguage.googleapis.com</code>)\n",
     ]
 
     # Model tracking: display default models (text & image) and runtime usage
@@ -53,33 +53,33 @@ def format_stats_report(stats: dict, gcp_report: Optional[GCPTelemetryReport] = 
     last_used = stats.get("last_used_model")
     models_used = stats.get("models_used", [])
 
-    lines.append("<b>Моделі (Models):</b>")
-    lines.append(f"  • Текст (Default Text): <code>{default_text_model}</code>")
-    lines.append(f"  • Зображення (Default Image): <code>{default_image_model}</code>")
+    lines.append("<b>Models:</b>")
+    lines.append(f"  • Default Text: <code>{default_text_model}</code>")
+    lines.append(f"  • Default Image: <code>{default_image_model}</code>")
     if last_used:
-        lines.append(f"  • Останнє використання (Last used): <code>{last_used}</code>")
+        lines.append(f"  • Last used: <code>{last_used}</code>")
     lines.append("")
 
     # 1. Billing / Actual Invoiced Spend
-    lines.append("<b>Фактичні витрати (Google Cloud Billing):</b>")
+    lines.append("<b>Actual Spend (Google Cloud Billing):</b>")
     if gcp_report.billing:
         if gcp_report.billing.status == "synced":
             lines.append(
-                f"  - Нараховано за місяць (MTD): <b>${gcp_report.billing.cost_usd:.4f} {gcp_report.billing.currency}</b>"
+                f"  - Month-to-date (MTD): <b>${gcp_report.billing.cost_usd:.4f} {gcp_report.billing.currency}</b>"
             )
         elif gcp_report.billing.status == "pending_first_export":
-            lines.append("  - Нараховано за місяць (MTD): <i>Очікується перший експорт BigQuery (~1-2 год)</i>")
+            lines.append("  - Month-to-date (MTD): <i>Awaiting first BigQuery export (~1-2h)</i>")
         elif gcp_report.billing.status == "unconfigured":
-            lines.append("  - Нараховано за місяць (MTD): <i>BigQuery таблиця не налаштована в .env</i>")
+            lines.append("  - Month-to-date (MTD): <i>BigQuery table not configured in .env</i>")
         else:
-            lines.append("  - Нараховано за місяць (MTD): <i>Помилка підключення до BigQuery</i>")
+            lines.append("  - Month-to-date (MTD): <i>Error connecting to BigQuery</i>")
     lines.append("")
 
     # 2. Live Velocity (Cloud Monitoring)
     if gcp_report.usage:
-        lines.append("<b>Поточне споживання квоти (Cloud Monitoring API):</b>")
+        lines.append("<b>Current Quota Usage (Cloud Monitoring API):</b>")
         lines.append(
-            f"  - Швидкість запитів (останні 10 хв): <b>{gcp_report.usage.current_rate_usage:.2f}</b> req/min"
+            f"  - Request rate (last 10 min): <b>{gcp_report.usage.current_rate_usage:.2f}</b> req/min"
         )
         lines.append("")
 

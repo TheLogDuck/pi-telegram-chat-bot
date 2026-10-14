@@ -33,8 +33,8 @@ def test_is_owner(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_format_stats_report_unconfigured() -> None:
     """Verifies that format_stats_report handles unconfigured GCP telemetry gracefully."""
     report = format_stats_report({})
-    assert "Статистика використання Gemini API (Google Cloud)" in report
-    assert "не налаштований" in report
+    assert "Gemini API Usage Statistics (Google Cloud)" in report
+    assert "not configured" in report
 
 
 def test_format_stats_report_with_gcp_telemetry() -> None:
@@ -59,14 +59,14 @@ def test_format_stats_report_with_gcp_telemetry() -> None:
     }
     report = format_stats_report(stats, gcp_report)
 
-    assert "Статистика використання Gemini API (Google Cloud)" in report
-    assert "Текст (Default Text): <code>gemini-3.8-flash</code>" in report
-    assert "Зображення (Default Image): <code>gemini-3.1-flash-lite-image</code>" in report
-    assert "Останнє використання (Last used): <code>gemini-3.8-flash</code>" in report
-    assert "Всі задіяні" not in report
+    assert "Gemini API Usage Statistics (Google Cloud)" in report
+    assert "Default Text: <code>gemini-3.8-flash</code>" in report
+    assert "Default Image: <code>gemini-3.1-flash-lite-image</code>" in report
+    assert "Last used: <code>gemini-3.8-flash</code>" in report
     assert "$0.1500 USD" in report
     assert "Cloud Quotas API" not in report
     assert "<b>3.50</b> req/min" in report
+
 
 
 def test_format_stats_report_no_quotas_rendered() -> None:
