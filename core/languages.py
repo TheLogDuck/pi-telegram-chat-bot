@@ -219,36 +219,36 @@ LOCALIZED_STRINGS: Dict[str, Dict[str, str]] = {
     },
     "admin_help_text": {
         "uk": (
-            "\n\n<b>Адміністрування:</b>\n"
-            "• <code>/access</code> — Список запитів та статусів доступу.\n"
-            "• <code>/approve [id]</code> — Надати доступ користувачу або групі.\n"
-            "• <code>/reject [id]</code> — Відхилити або відкликати доступ.\n"
-            "• <code>/stats</code> — Детальна статистика токенів Gemini (Tier 1) та витрат.\n"
-            "• <code>/switch_reaction [id]</code> — Увімкнути або вимкнути емоційні реакції бота для чату."
+            "\n\n<b>Administration:</b>\n"
+            "• <code>/access</code> — View approved access grants.\n"
+            "• <code>/approve [id]</code> — Approve access for user or group.\n"
+            "• <code>/reject [id]</code> — Revoke access for user or group.\n"
+            "• <code>/stats</code> — Detailed Gemini token statistics and costs.\n"
+            "• <code>/switch_reaction [id]</code> — Toggle AI emotional reactions for the chat."
         ),
         "ru": (
-            "\n\n<b>Администрирование:</b>\n"
-            "• <code>/access</code> — Список запросов и статусов доступа.\n"
-            "• <code>/approve [id]</code> — Одобрить доступ для пользователя или группы.\n"
-            "• <code>/reject [id]</code> — Отклонить или отозвать доступ.\n"
-            "• <code>/stats</code> — Детальная статистика токенов Gemini (Tier 1) и расходов.\n"
-            "• <code>/switch_reaction [id]</code> — Включить или выключить эмоциональные реакции бота для чата."
+            "\n\n<b>Administration:</b>\n"
+            "• <code>/access</code> — View approved access grants.\n"
+            "• <code>/approve [id]</code> — Approve access for user or group.\n"
+            "• <code>/reject [id]</code> — Revoke access for user or group.\n"
+            "• <code>/stats</code> — Detailed Gemini token statistics and costs.\n"
+            "• <code>/switch_reaction [id]</code> — Toggle AI emotional reactions for the chat."
         ),
         "en": (
             "\n\n<b>Administration:</b>\n"
-            "• <code>/access</code> — List of access requests and statuses.\n"
+            "• <code>/access</code> — View approved access grants.\n"
             "• <code>/approve [id]</code> — Approve access for user or group.\n"
-            "• <code>/reject [id]</code> — Reject or revoke access.\n"
-            "• <code>/stats</code> — Detailed Gemini token statistics (Tier 1) and costs.\n"
+            "• <code>/reject [id]</code> — Revoke access for user or group.\n"
+            "• <code>/stats</code> — Detailed Gemini token statistics and costs.\n"
             "• <code>/switch_reaction [id]</code> — Toggle AI emotional reactions for the chat."
         ),
         "de": (
             "\n\n<b>Administration:</b>\n"
-            "• <code>/access</code> — Liste der Zugriffsanfragen und Status.\n"
-            "• <code>/approve [id]</code> — Zugriff für Benutzer oder Gruppe genehmigen.\n"
-            "• <code>/reject [id]</code> — Zugriff ablehnen oder widerrufen.\n"
-            "• <code>/stats</code> — Detaillierte Gemini-Token-Statistiken (Tier 1) und Kosten.\n"
-            "• <code>/switch_reaction [id]</code> — KI-Emotionsreaktionen für den Chat ein-/ausschalten."
+            "• <code>/access</code> — View approved access grants.\n"
+            "• <code>/approve [id]</code> — Approve access for user or group.\n"
+            "• <code>/reject [id]</code> — Revoke access for user or group.\n"
+            "• <code>/stats</code> — Detailed Gemini token statistics and costs.\n"
+            "• <code>/switch_reaction [id]</code> — Toggle AI emotional reactions for the chat."
         ),
     },
 }

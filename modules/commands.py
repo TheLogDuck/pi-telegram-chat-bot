@@ -40,12 +40,12 @@ PUBLIC_HELP_TEXT = (
 
 ADMIN_HELP_TEXT = (
     PUBLIC_HELP_TEXT + "\n\n"
-    "<b>Адміністрування:</b>\n"
-    "• <code>/access</code> — Список запитів та статусів доступу.\n"
-    "• <code>/approve [id]</code> — Надати доступ користувачу або групі.\n"
-    "• <code>/reject [id]</code> — Відхилити або відкликати доступ.\n"
-    "• <code>/stats</code> — Детальна статистика токенів Gemini (Tier 1) та витрат.\n"
-    "• <code>/switch_reaction [id]</code> — Увімкнути або вимкнути емоційні реакції бота для чату."
+    "<b>Administration:</b>\n"
+    "• <code>/access</code> — View approved access grants.\n"
+    "• <code>/approve [id]</code> — Approve access for a user or group.\n"
+    "• <code>/reject [id]</code> — Revoke access for a user or group.\n"
+    "• <code>/stats</code> — Detailed Gemini token usage and cost metrics.\n"
+    "• <code>/switch_reaction [id]</code> — Toggle bot emotional reactions for chat."
 )
 
 
@@ -102,26 +102,26 @@ def register_commands(app: Application) -> None:
     app.add_handler(CommandHandler("ping", ping_command))
 
 
-# Command directory for general users (public scope)
+# Command directory for general users (public scope in universal English)
 PUBLIC_BOT_COMMANDS = [
-    BotCommand("start", "Почати взаємодію та переглянути привітання"),
-    BotCommand("help", "Показати довідку щодо команд"),
-    BotCommand("ping", "Перевірити доступність та час відповіді бота"),
-    BotCommand("news", "Отримати дайджест актуальних новин"),
-    BotCommand("roast", "Влаштувати дружній роаст користувача"),
-    BotCommand("meme", "Згенерувати мем або зображення через ШІ"),
-    BotCommand("persona", "Обрати стиль або персону спілкування"),
-    BotCommand("lang", "Обрати мову спілкування бота для чату"),
+    BotCommand("start", "Start interaction and view greeting"),
+    BotCommand("help", "Show command guide and capabilities"),
+    BotCommand("ping", "Check bot latency and responsiveness"),
+    BotCommand("news", "Get latest news briefing with Google Search"),
+    BotCommand("roast", "Friendly comedy roast of a chat member"),
+    BotCommand("meme", "Generate an AI meme or image"),
+    BotCommand("persona", "Select bot personality style"),
+    BotCommand("lang", "Choose chat communication language"),
 ]
 BOT_COMMANDS = PUBLIC_BOT_COMMANDS
 
-# Extended command directory for the owner (private chat scope)
+# Extended command directory for the owner (private chat scope in universal English)
 ADMIN_BOT_COMMANDS = PUBLIC_BOT_COMMANDS + [
-    BotCommand("stats", "Статистика токенів Gemini та витрат"),
-    BotCommand("access", "Список запитів та статусів доступу"),
-    BotCommand("approve", "Схвалити доступ для ID або групи"),
-    BotCommand("reject", "Відхилити або відкликати доступ"),
-    BotCommand("switch_reaction", "Увімкнути або вимкнути емоційні реакції для чату"),
+    BotCommand("stats", "Gemini token usage and cost metrics"),
+    BotCommand("access", "List access requests and whitelist status"),
+    BotCommand("approve", "Approve access for a user ID or group"),
+    BotCommand("reject", "Revoke or reject access for an ID"),
+    BotCommand("switch_reaction", "Toggle automatic emoji reactions for chat"),
 ]
 
 
