@@ -234,7 +234,7 @@ def test_auth_callback_approve_user(monkeypatch, tmp_path):
     query.edit_message_text.assert_awaited_once()
     context.bot.send_message.assert_awaited_once_with(
         chat_id=555,
-        text="<b>Доступ надано!</b> Тепер ви можете повноцінно користуватися ботом.",
+        text="<b>Access granted!</b> You can now use the bot.",
         parse_mode=ParseMode.HTML,
     )
 
@@ -255,7 +255,7 @@ def test_auth_callback_non_admin_forbidden(monkeypatch):
     asyncio.run(auth_callback_handler(update, context))
 
     query.answer.assert_awaited_once_with(
-        "У вас немає прав для виконання цієї дії.", show_alert=True
+        "You do not have permission to perform this action.", show_alert=True
     )
 
 
@@ -300,13 +300,16 @@ def test_manual_approve_and_reject_commands(monkeypatch, tmp_path):
 
 
 def test_access_list_command(monkeypatch, tmp_path):
-    """Verifies /access command displays list of tracked requests."""
+    """Verifies /access command displays only approved entities and excludes rejected/pending."""
     test_db = str(tmp_path / "test.db")
     init_db(test_db)
     monkeypatch.setenv("DATABASE_PATH", test_db)
     monkeypatch.setenv("ADMIN_CHAT_ID", "9999")
 
+    # Add approved, rejected, and pending records
     asyncio.run(async_set_access_status("user", 888, "approved", db_path=test_db))
+    asyncio.run(async_set_access_status("user", 777, "rejected", db_path=test_db))
+    asyncio.run(async_set_access_status("chat", -1055, "pending", db_path=test_db))
 
     update = make_update(ChatType.PRIVATE, "/access", user_id=9999)
     context = make_context()
@@ -314,7 +317,10 @@ def test_access_list_command(monkeypatch, tmp_path):
     asyncio.run(access_list_command(update, context))
     update.effective_message.reply_text.assert_awaited_once()
     msg = update.effective_message.reply_text.call_args[0][0]
+    assert "Approved Access List:" in msg
     assert "888" in msg
+    assert "777" not in msg
+    assert "-1055" not in msg
 
 
 def test_admin_in_unapproved_group_is_blocked_with_guidance(monkeypatch, tmp_path):

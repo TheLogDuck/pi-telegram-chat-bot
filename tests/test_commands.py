@@ -47,7 +47,7 @@ def test_help_command_regular_user() -> None:
 
     call_text = mock_update.effective_message.reply_text.call_args[0][0]
     assert "Основні команди:" in call_text
-    assert "Адміністрування:" not in call_text
+    assert "Administration:" not in call_text
 
 
 def test_help_command_admin(monkeypatch) -> None:
@@ -60,7 +60,7 @@ def test_help_command_admin(monkeypatch) -> None:
     asyncio.run(help_command(mock_update, mock_context))
 
     call_text = mock_update.effective_message.reply_text.call_args[0][0]
-    assert "Адміністрування:" in call_text
+    assert "Administration:" in call_text
     assert "/access" in call_text
     assert "/approve" in call_text
     assert "/reject" in call_text
@@ -112,7 +112,7 @@ def test_stats_command_owner(monkeypatch) -> None:
 
         assert mock_update.effective_message.reply_text.await_count == 1
         call_args = mock_update.effective_message.reply_text.await_args
-        assert "Статистика використання Gemini API" in call_args[0][0]
+        assert "Gemini API Usage Statistics" in call_args[0][0]
 
 
 def test_set_bot_commands(monkeypatch) -> None:

@@ -244,7 +244,7 @@ async def auth_callback_handler(
 
     # Verify that the user clicking the button is the authorized bot administrator
     if not is_admin(query.from_user.id):
-        await query.answer("У вас немає прав для виконання цієї дії.", show_alert=True)
+        await query.answer("You do not have permission to perform this action.", show_alert=True)
         return
 
     match = re.match(r"^auth:(approve|reject):(user|chat):(-?\d+)$", query.data)
@@ -264,14 +264,14 @@ async def auth_callback_handler(
     else:
         _APPROVED_CACHE.discard((entity_type, entity_id))
 
-    action_label = "схвалено" if action == "approve" else "відхилено"
-    type_label = "користувача" if entity_type == "user" else "групи"
+    action_label = "approved" if action == "approve" else "rejected"
+    type_label = "user" if entity_type == "user" else "group"
 
     # Update the admin notification message to remove inline buttons
     try:
         await query.edit_message_text(
-            f"<b>Запит {action_label}:</b>\n"
-            f"Тип: {type_label}\n"
+            f"<b>Request {action_label}:</b>\n"
+            f"Type: {type_label}\n"
             f"ID: <code>{entity_id}</code>",
             parse_mode=ParseMode.HTML,
         )
@@ -283,13 +283,13 @@ async def auth_callback_handler(
         try:
             await context.bot.send_message(
                 chat_id=entity_id,
-                text="<b>Доступ надано!</b> Тепер ви можете повноцінно користуватися ботом.",
+                text="<b>Access granted!</b> You can now use the bot.",
                 parse_mode=ParseMode.HTML,
             )
         except Exception as exc:
             logger.info(f"Could not notify entity {entity_id} of approval: {exc}")
 
-    await query.answer(f"Запит {action_label}.")
+    await query.answer(f"Request {action_label}.")
 
 
 async def approve_command(
@@ -309,13 +309,13 @@ async def approve_command(
             await async_set_access_status("chat", chat_id, "approved")
             _APPROVED_CACHE.add(("chat", chat_id))
             await message.reply_text(
-                f"Цю групу (ID: <code>{chat_id}</code>) успішно схвалено.",
+                f"This group (ID: <code>{chat_id}</code>) was successfully approved.",
                 parse_mode=ParseMode.HTML,
             )
             return
 
         await message.reply_text(
-            "<b>Використання:</b> <code>/approve &lt;id&gt;</code> або просто <code>/approve</code> у групі.",
+            "<b>Usage:</b> <code>/approve &lt;id&gt;</code> or simply <code>/approve</code> inside a group.",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -324,7 +324,7 @@ async def approve_command(
         target_id = int(context.args[0])
     except ValueError:
         await message.reply_text(
-            "<b>Помилка:</b> Будь ласка, вкажіть коректний числовий ID.",
+            "<b>Error:</b> Please provide a valid numeric ID.",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -334,7 +334,7 @@ async def approve_command(
     await async_set_access_status(entity_type, target_id, "approved")
     _APPROVED_CACHE.add((entity_type, target_id))
     await message.reply_text(
-        f"Доступ для <b>{entity_type}</b> ID <code>{target_id}</code> успішно надано.",
+        f"Access for <b>{entity_type}</b> ID <code>{target_id}</code> successfully granted.",
         parse_mode=ParseMode.HTML,
     )
 
@@ -357,7 +357,7 @@ async def reject_command(
         target_name = f"@{target_user.username}" if target_user.username else target_user.first_name
         escaped_name = html.escape(target_name)
         await message.reply_text(
-            f"Доступ для <b>{escaped_name}</b> (ID: <code>{target_user.id}</code>) відкликано.",
+            f"Access for <b>{escaped_name}</b> (ID: <code>{target_user.id}</code>) revoked.",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -369,13 +369,13 @@ async def reject_command(
             await async_set_access_status("chat", chat_id, "rejected")
             _APPROVED_CACHE.discard(("chat", chat_id))
             await message.reply_text(
-                f"Доступ для цієї групи (ID: <code>{chat_id}</code>) відкликано.",
+                f"Access for this group (ID: <code>{chat_id}</code>) revoked.",
                 parse_mode=ParseMode.HTML,
             )
             return
 
         await message.reply_text(
-            "<b>Використання:</b> <code>/reject &lt;id&gt;</code> або надішліть у відповідь (reply) на повідомлення.",
+            "<b>Usage:</b> <code>/reject &lt;id&gt;</code> or reply to a user's message.",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -384,7 +384,7 @@ async def reject_command(
         target_id = int(context.args[0])
     except ValueError:
         await message.reply_text(
-            "<b>Помилка:</b> Будь ласка, вкажіть коректний числовий ID.",
+            "<b>Error:</b> Please provide a valid numeric ID.",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -393,7 +393,7 @@ async def reject_command(
     await async_set_access_status(entity_type, target_id, "rejected")
     _APPROVED_CACHE.discard((entity_type, target_id))
     await message.reply_text(
-        f"Доступ для <b>{entity_type}</b> ID <code>{target_id}</code> відхилено / відкликано.",
+        f"Access for <b>{entity_type}</b> ID <code>{target_id}</code> revoked.",
         parse_mode=ParseMode.HTML,
     )
 
@@ -402,26 +402,27 @@ async def access_list_command(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    """Displays tracked access requests and whitelist status for the admin via /access."""
+    """Displays only approved entities for the admin via /access."""
     message = update.effective_message
     user = update.effective_user
     if not message or not user or not is_admin(user.id):
         return
 
     grants = await async_get_all_access_grants()
-    if not grants:
+    # Filter strictly for approved entities to omit rejected or pending entries
+    approved_grants = [g for g in grants if g["status"] == "approved"]
+    if not approved_grants:
         await message.reply_text(
-            "<b>Список доступу:</b> Список запитів на доступ порожній.",
+            "<b>Approved Access List:</b> No approved users or groups found.",
             parse_mode=ParseMode.HTML,
         )
         return
 
-    lines = ["<b>Список запитів на доступ:</b>\n"]
-    for g in grants[:20]:  # Limit to 20 most recent
-        status_label = g["status"].upper()
-        title = html.escape(g["entity_title"] or "Невідомо")
+    lines = ["<b>Approved Access List:</b>\n"]
+    for g in approved_grants[:20]:  # Limit to 20 most recent
+        title = html.escape(g["entity_title"] or "Unknown")
         lines.append(
-            f"• [<b>{status_label}</b>] {g['entity_type']} <code>{g['entity_id']}</code> ({title})"
+            f"• [<b>APPROVED</b>] {g['entity_type']} <code>{g['entity_id']}</code> ({title})"
         )
 
     await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
