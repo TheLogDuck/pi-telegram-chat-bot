@@ -12,7 +12,8 @@ from core.llm import generate_response
 from core.logger import setup_logger
 from modules.analytics import stats_command
 from modules.commands import help_command, ping_command
-from modules.intent import IntentType, detect_intent
+from modules.intent import IntentResult, IntentType, detect_intent
+from modules.language import language_command
 from modules.news import news_command
 from modules.roast import roast_command
 from modules.meme import meme_command
@@ -33,6 +34,39 @@ from core.telegram_utils import (
     is_bot_mentioned,
     send_formatted_reply,
 )
+
+
+async def _dispatch_intent(
+    intent_result: IntentResult,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> bool:
+    """Dispatches recognized command intents to their dedicated handler modules.
+
+    Uses pattern matching to cleanly route intents with specific arguments.
+    Returns True if an intent was handled, or False to fall through to Gemini conversational AI.
+    """
+    match intent_result.intent:
+        case IntentType.PING:
+            await ping_command(update, context)
+        case IntentType.HELP:
+            await help_command(update, context)
+        case IntentType.STATS:
+            await stats_command(update, context)
+        case IntentType.NEWS:
+            await news_command(update, context, topic=intent_result.topic)
+        case IntentType.ROAST:
+            await roast_command(update, context, target_user=intent_result.target_user)
+        case IntentType.MEME:
+            await meme_command(update, context, prompt=intent_result.topic)
+        case IntentType.PERSONA:
+            await persona_command(update, context)
+        case IntentType.LANGUAGE:
+            await language_command(update, context)
+        case _:
+            # Unmatched or general chat intent falls through to open-ended dialogue
+            return False
+    return True
 
 
 async def conversational_chat_handler(
@@ -67,34 +101,9 @@ async def conversational_chat_handler(
         )
         return
 
-    # Check for natural language or slash command intents
+    # Check for natural language or slash command intents and dispatch if recognized
     intent_result = detect_intent(cleaned_prompt)
-
-    # Route matched commands to their specialized handlers
-    if intent_result.intent == IntentType.PING:
-        await ping_command(update, context)
-        return
-    elif intent_result.intent == IntentType.HELP:
-        await help_command(update, context)
-        return
-    elif intent_result.intent == IntentType.STATS:
-        await stats_command(update, context)
-        return
-    elif intent_result.intent == IntentType.NEWS:
-        await news_command(update, context, topic=intent_result.topic)
-        return
-    elif intent_result.intent == IntentType.ROAST:
-        await roast_command(update, context, target_user=intent_result.target_user)
-        return
-    elif intent_result.intent == IntentType.MEME:
-        await meme_command(update, context, prompt=intent_result.topic)
-        return
-    elif intent_result.intent == IntentType.PERSONA:
-        await persona_command(update, context)
-        return
-    elif intent_result.intent == IntentType.LANGUAGE:
-        from modules.language import language_command
-        await language_command(update, context)
+    if await _dispatch_intent(intent_result, update, context):
         return
 
     # Inform the user that Gemini is processing their response

@@ -7,6 +7,7 @@ from telegram.constants import ChatAction, ChatType, ParseMode
 from telegram.ext import Application
 from modules.conversational import (
     EMPTY_TAG_PROMPT,
+    _dispatch_intent,
     clean_bot_mention,
     conversational_chat_handler,
     is_bot_mentioned,
@@ -129,7 +130,7 @@ def test_conversational_handler_tagged_generates_ai_response(mock_generate: Asyn
     assert mock_generate.await_args.args[0] == "розкажи про зорі"
     assert mock_generate.await_args.kwargs.get("persona_key") == "standard"
     update.effective_message.reply_text.assert_awaited_once_with(
-        "Це чудове запитання про науку.\n\nМодель: gemini-3.8-flash",
+        "Це чудове запитання про науку.\n\ngemini-3.8-flash",
         parse_mode=ParseMode.HTML,
     )
 
@@ -206,6 +207,25 @@ def test_conversational_handler_dispatches_meme_intent(mock_meme: AsyncMock) -> 
 
     mock_meme.assert_awaited_once_with(update, context, prompt="програмування")
 
+
+@patch("modules.conversational.language_command", new_callable=AsyncMock)
+def test_dispatch_intent_language_and_chat_fallback(mock_language: AsyncMock) -> None:
+    """Verifies that _dispatch_intent handles LANGUAGE and returns False for CHAT."""
+    from modules.intent import IntentResult, IntentType
+
+    update = make_chat_update(ChatType.PRIVATE, "/lang")
+    context = MagicMock()
+
+    # Handled intent returns True
+    res_lang = IntentResult(intent=IntentType.LANGUAGE, confidence=1.0)
+    handled = asyncio.run(_dispatch_intent(res_lang, update, context))
+    assert handled is True
+    mock_language.assert_awaited_once_with(update, context)
+
+    # General chat intent returns False (falls through to AI conversation)
+    res_chat = IntentResult(intent=IntentType.CHAT, confidence=1.0)
+    handled_chat = asyncio.run(_dispatch_intent(res_chat, update, context))
+    assert handled_chat is False
 
 
 def test_register_conversational() -> None:
