@@ -118,7 +118,7 @@ def test_format_reply_with_model() -> None:
     assert format_reply_with_model("Привіт", None) == "Привіт"
     assert format_reply_with_model("Привіт", "") == "Привіт"
 
-    # When model is specified, appends footer
-    expected = "Привіт\n\nМодель: gemini-3.8-flash"
+    # When model is specified, appends footer without the word 'Модель'
+    expected = "Привіт\n\ngemini-3.8-flash"
     assert format_reply_with_model("Привіт", "gemini-3.8-flash") == expected
 

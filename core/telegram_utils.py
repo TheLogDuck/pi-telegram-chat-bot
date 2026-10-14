@@ -155,5 +155,6 @@ def format_reply_with_model(text: str, model_name: Optional[str]) -> str:
     """
     if not model_name:
         return text
-    return f"{text}\n\nМодель: {model_name}"
+    # Append the model name directly without hardcoded Cyrillic label
+    return f"{text}\n\n{model_name}"
 

@@ -73,8 +73,9 @@ async def meme_command(
         photo_stream = io.BytesIO(image_bytes)
         photo_stream.name = "meme.png"
         escaped_prompt = html.escape(target_prompt)
+        # Append model name directly without the word 'Модель'
         caption = (
-            f"{escaped_prompt}\n\n<b>Модель:</b> {html.escape(model_used)}"
+            f"{escaped_prompt}\n\n{html.escape(model_used)}"
             if model_used
             else escaped_prompt
         )

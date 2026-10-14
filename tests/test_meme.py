@@ -66,7 +66,7 @@ def test_meme_command_success_with_args(mock_generate: AsyncMock) -> None:
     )
     update.effective_message.reply_photo.assert_awaited_once()
     call_kwargs = update.effective_message.reply_photo.await_args.kwargs
-    assert call_kwargs["caption"] == "funny cat on pi\n\n<b>Модель:</b> gemini-2.5-flash-image"
+    assert call_kwargs["caption"] == "funny cat on pi\n\ngemini-2.5-flash-image"
     assert call_kwargs["parse_mode"] == ParseMode.HTML
     assert call_kwargs["photo"].read() == fake_png_bytes
 
@@ -92,7 +92,7 @@ def test_meme_command_injected_prompt(mock_generate: AsyncMock) -> None:
     )
     update.effective_message.reply_photo.assert_awaited_once()
     call_kwargs = update.effective_message.reply_photo.await_args.kwargs
-    assert call_kwargs["caption"] == "програмування\n\n<b>Модель:</b> gemini-2.5-flash-image"
+    assert call_kwargs["caption"] == "програмування\n\ngemini-2.5-flash-image"
     assert call_kwargs["parse_mode"] == ParseMode.HTML
 
 
