@@ -53,3 +53,17 @@ def test_get_localized_string() -> None:
 
     # Fallback to default language if requested language is unsupported
     assert "Оберіть мову" in get_localized_string("select_language_title", "unknown_lang")
+
+
+def test_rate_limit_strings_available_in_all_languages() -> None:
+    """Verifies that rate_limit_user and rate_limit_chat exist in uk, ru, en, and de."""
+    for lang in ("uk", "ru", "en", "de"):
+        user_msg = get_localized_string("rate_limit_user", lang)
+        chat_msg = get_localized_string("rate_limit_chat", lang)
+
+        # Assert not falling back to key string and non-empty
+        assert user_msg != "rate_limit_user"
+        assert chat_msg != "rate_limit_chat"
+        assert len(user_msg) > 10
+        assert len(chat_msg) > 10
+

@@ -6,6 +6,7 @@ from google.genai import types
 from core.logger import setup_logger
 from core.personas import get_persona
 from .client import get_gemini_client
+from .concurrency import get_llm_semaphore
 from .config import ALLOWED_TELEGRAM_REACTIONS, get_candidate_reaction_models
 from .telemetry import record_usage
 
@@ -81,24 +82,26 @@ async def decide_message_reaction(
     )
     llm_client = client or get_gemini_client()
 
-    for model_name in get_candidate_reaction_models():
-        try:
-            response = await llm_client.aio.models.generate_content(
-                model=model_name,
-                contents=prompt,
-                config=config,
-            )
-            await _dispatch_record_usage(response, model_name, "reaction", chat_id, user_id)
-            raw = (response.text or "").strip().strip("\"'").strip()
-            if not raw or raw.upper() == "NONE":
+    semaphore = get_llm_semaphore()
+    async with semaphore:
+        for model_name in get_candidate_reaction_models():
+            try:
+                response = await llm_client.aio.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=config,
+                )
+                await _dispatch_record_usage(response, model_name, "reaction", chat_id, user_id)
+                raw = (response.text or "").strip().strip("\"'").strip()
+                if not raw or raw.upper() == "NONE":
+                    return None, model_name
+                if raw in ALLOWED_TELEGRAM_REACTIONS:
+                    return raw, model_name
+                logger.info(f"Model {model_name} suggested invalid or unwhitelisted reaction: {raw}")
                 return None, model_name
-            if raw in ALLOWED_TELEGRAM_REACTIONS:
-                return raw, model_name
-            logger.info(f"Model {model_name} suggested invalid or unwhitelisted reaction: {raw}")
-            return None, model_name
-        except Exception as exc:
-            logger.warning(f"Reaction evaluation with {model_name} failed: {exc}. Trying next...")
-            continue
+            except Exception as exc:
+                logger.warning(f"Reaction evaluation with {model_name} failed: {exc}. Trying next...")
+                continue
 
     logger.error("All candidate reaction models exhausted.")
     return None, None

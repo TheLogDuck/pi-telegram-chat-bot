@@ -6,6 +6,7 @@ from google.genai import types
 from core.logger import setup_logger
 from core.personas import get_persona
 from .client import get_gemini_client
+from .concurrency import get_llm_semaphore
 from .config import IMAGE_ERROR_MESSAGE, get_candidate_image_models
 from .telemetry import record_usage
 
@@ -54,21 +55,23 @@ async def generate_meme_image(
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
 
-    for model_name in get_candidate_image_models():
-        try:
-            response = await llm_client.aio.models.generate_content(
-                model=model_name,
-                contents=full_prompt,
-                config=config,
-            )
-            data, mime = _extract_image_data(response)
-            if data:
-                await _dispatch_record_usage(response, model_name, "meme", chat_id, user_id)
-                return data, mime, None, model_name
-            logger.warning(f"Image model {model_name} returned no image parts.")
-        except Exception as exc:
-            logger.warning(f"Image generation with {model_name} failed: {exc}. Trying next candidate...")
-            continue
+    semaphore = get_llm_semaphore()
+    async with semaphore:
+        for model_name in get_candidate_image_models():
+            try:
+                response = await llm_client.aio.models.generate_content(
+                    model=model_name,
+                    contents=full_prompt,
+                    config=config,
+                )
+                data, mime = _extract_image_data(response)
+                if data:
+                    await _dispatch_record_usage(response, model_name, "meme", chat_id, user_id)
+                    return data, mime, None, model_name
+                logger.warning(f"Image model {model_name} returned no image parts.")
+            except Exception as exc:
+                logger.warning(f"Image generation with {model_name} failed: {exc}. Trying next candidate...")
+                continue
 
     logger.error("All Nano Banana image models exhausted.")
     return None, None, IMAGE_ERROR_MESSAGE, None

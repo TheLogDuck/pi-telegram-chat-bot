@@ -62,6 +62,45 @@ async def async_save_message(
     )
 
 
+def save_messages_batch(
+    messages: list[tuple[int, int, Optional[str], str, str]],
+    db_path: Optional[str] = None,
+) -> int:
+    """Inserts a batch of messages into SQLite in a single transaction using executemany.
+
+    Consolidates multiple writes into one disk sync (fsync), dramatically reducing MicroSD
+    wear and eliminating single-writer lock contention during active chat bursts.
+    """
+    if not messages:
+        return 0
+    path = db_path or get_db_path()
+    with get_connection(path) as conn:
+        cursor = conn.cursor()
+        cursor.executemany(
+            """
+            INSERT INTO messages (chat_id, user_id, username, text, timestamp)
+            VALUES (?, ?, ?, ?, ?);
+            """,
+            messages,
+        )
+        conn.commit()
+        return cursor.rowcount
+
+
+async def async_save_messages_batch(
+    messages: list[tuple[int, int, Optional[str], str, str]],
+    db_path: Optional[str] = None,
+) -> int:
+    """Non-blocking async wrapper to insert a batch of messages in a worker thread."""
+    if not messages:
+        return 0
+    return await asyncio.to_thread(
+        save_messages_batch,
+        messages,
+        db_path,
+    )
+
+
 def get_chat_messages(
     chat_id: int,
     username: Optional[str] = None,

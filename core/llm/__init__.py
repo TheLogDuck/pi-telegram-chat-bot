@@ -20,6 +20,7 @@ from .config import (
     get_candidate_models,
     get_candidate_reaction_models,
 )
+from .concurrency import DEFAULT_MAX_CONCURRENT_LLM_CALLS, get_llm_semaphore
 from .engine import execute_text_generation
 from .chat import generate_response
 from .meme import _extract_image_data, generate_meme_image
@@ -33,8 +34,10 @@ from .roast import _build_roast_prompt, generate_roast
 from .telemetry import record_usage
 
 __all__ = [
-    # Client
+    # Client and Concurrency
     "get_gemini_client",
+    "get_llm_semaphore",
+    "DEFAULT_MAX_CONCURRENT_LLM_CALLS",
     # Telemetry and Execution
     "record_usage",
     "execute_text_generation",

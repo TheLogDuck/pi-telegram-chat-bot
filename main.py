@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # Load environment configuration early so logging and module singletons reflect .env settings
 load_dotenv()
 
-from telegram.ext import Application, ApplicationBuilder
+from telegram.ext import AIORateLimiter, Application, ApplicationBuilder
 from core.database.connection import init_db
 from core.database.messages import async_cleanup_old_messages
 from core.error_handler import global_error_handler
@@ -15,7 +15,11 @@ from core.logger import setup_logger
 from modules.analytics import register_analytics
 from modules.commands import register_commands, set_bot_commands
 from modules.conversational import register_conversational
-from modules.listener import register_listener
+from modules.listener import (
+    flush_message_queue,
+    message_batch_worker,
+    register_listener,
+)
 from modules.news import register_news
 from modules.roast import register_roast
 from modules.meme import register_meme
@@ -57,16 +61,24 @@ async def on_startup(app: Application) -> None:
     cleanup_task = asyncio.create_task(periodic_cleanup_task())
     app.bot_data["cleanup_task"] = cleanup_task
 
+    # Launch periodic batch flusher for passive chat message persistence
+    flusher_task = asyncio.create_task(message_batch_worker())
+    app.bot_data["flusher_task"] = flusher_task
+
 
 async def on_shutdown(app: Application) -> None:
     """Gracefully cancels background tasks upon shutdown or SIGINT."""
-    task = app.bot_data.get("cleanup_task")
-    if task:
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+    for task_name in ("cleanup_task", "flusher_task"):
+        task = app.bot_data.get(task_name)
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+    # Persist any remaining messages still buffered in the queue
+    await flush_message_queue()
 
 
 def main() -> None:
@@ -85,14 +97,24 @@ def main() -> None:
         logger.error("Missing TELEGRAM_BOT_TOKEN in .env file.")
         sys.exit(1)
 
-    # Build Telegram bot application with lifecycle hooks for commands and tasks
-    app = (
+    # Build Telegram bot application with AIORateLimiter and concurrent updates enabled
+    builder = (
         ApplicationBuilder()
         .token(token)
+        .concurrent_updates(True)
         .post_init(on_startup)
         .post_shutdown(on_shutdown)
-        .build()
     )
+
+    try:
+        builder = builder.rate_limiter(AIORateLimiter())
+    except RuntimeError as exc:
+        logger.warning(
+            f"AIORateLimiter could not be initialized ({exc}). "
+            "To enable outbound rate limiting, install: pip install \"python-telegram-bot[rate-limiter]\""
+        )
+
+    app = builder.build()
 
 
     # Register passive message logging handler (group -2)

@@ -1,5 +1,5 @@
-# Async Telegram bot framework (v20+ async architecture)
-python-telegram-bot==22.8
+# Async Telegram bot framework with rate-limiter support (v20+ async architecture)
+python-telegram-bot[rate-limiter]==22.8
 
 # Lightweight Google Gemini API client
 google-genai==2.28.0

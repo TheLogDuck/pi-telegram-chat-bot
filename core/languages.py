@@ -251,6 +251,18 @@ LOCALIZED_STRINGS: Dict[str, Dict[str, str]] = {
             "• <code>/switch_reaction [id]</code> — Toggle AI emotional reactions for the chat."
         ),
     },
+    "rate_limit_user": {
+        "uk": "Зачекайте, будь ласка, кілька секунд перед наступним запитом.",
+        "ru": "Пожалуйста, подождите несколько секунд перед следующим запросом.",
+        "en": "Please wait a few seconds before sending another request.",
+        "de": "Bitte warten Sie einige Sekunden vor der nächsten Anfrage.",
+    },
+    "rate_limit_chat": {
+        "uk": "У цьому чаті зараз виконується забагато запитів. Зачекайте хвилинку.",
+        "ru": "В этом чате сейчас выполняется слишком много запросов. Подождите минутку.",
+        "en": "Too many requests are being processed in this chat right now. Please wait a moment.",
+        "de": "In diesem Chat werden derzeit zu viele Anfragen verarbeitet. Bitte warten Sie einen Moment.",
+    },
 }
 
 

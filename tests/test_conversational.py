@@ -234,3 +234,69 @@ def test_register_conversational() -> None:
     register_conversational(mock_app)
     mock_app.add_handler.assert_called_once()
     assert mock_app.add_handler.call_args[1]["group"] == 0
+
+
+@patch("modules.conversational.generate_response", new_callable=AsyncMock)
+def test_conversational_handler_user_rate_limited(mock_generate: AsyncMock) -> None:
+    """Verifies that subsequent prompts within cooldown window are rejected."""
+    from core.languages import get_localized_string
+    from core.rate_limiter import get_rate_limiter
+
+    limiter = get_rate_limiter()
+    limiter._user_last_request.clear()
+
+    update = make_chat_update(ChatType.GROUP, "@my_bot перше запитання")
+    update.effective_message.from_user = MagicMock()
+    update.effective_message.from_user.id = 77777
+
+    context = MagicMock()
+    context.bot.username = "my_bot"
+    context.bot.id = 999
+    context.bot.send_chat_action = AsyncMock()
+
+    # First prompt passes
+    mock_generate.return_value = ("Відповідь 1", "gemini-3.8-flash")
+    asyncio.run(conversational_chat_handler(update, context))
+    assert mock_generate.await_count == 1
+
+    # Immediate second prompt from same user must be blocked by cooldown
+    update2 = make_chat_update(ChatType.GROUP, "@my_bot друге запитання")
+    update2.effective_message.from_user = MagicMock()
+    update2.effective_message.from_user.id = 77777
+
+    asyncio.run(conversational_chat_handler(update2, context))
+    # generate_response should NOT have been called a second time
+    assert mock_generate.await_count == 1
+    expected_notice = get_localized_string("rate_limit_user", "uk")
+    update2.effective_message.reply_text.assert_awaited_once_with(expected_notice)
+
+
+@patch("modules.conversational.generate_response", new_callable=AsyncMock)
+def test_conversational_handler_chat_concurrency_limited(mock_generate: AsyncMock) -> None:
+    """Verifies that requests exceeding chat concurrency limit are rejected."""
+    from core.languages import get_localized_string
+    from core.rate_limiter import get_rate_limiter
+
+    limiter = get_rate_limiter()
+    limiter._user_last_request.clear()
+    limiter._chat_active_tasks.clear()
+
+    # Manually fill chat capacity
+    chat_id = 123456
+    limiter._chat_active_tasks[chat_id] = limiter.max_chat_concurrency
+
+    update = make_chat_update(ChatType.GROUP, "@my_bot запитання при зайнятому чаті")
+    update.effective_message.from_user = MagicMock()
+    update.effective_message.from_user.id = 88888
+
+    context = MagicMock()
+    context.bot.username = "my_bot"
+    context.bot.id = 999
+
+    asyncio.run(conversational_chat_handler(update, context))
+
+    # Gemini must not have been called
+    mock_generate.assert_not_called()
+    expected_notice = get_localized_string("rate_limit_chat", "uk")
+    update.effective_message.reply_text.assert_awaited_once_with(expected_notice)
+

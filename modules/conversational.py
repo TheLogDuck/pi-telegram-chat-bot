@@ -10,6 +10,7 @@ from core.database.personas import async_get_user_persona
 from core.languages import get_localized_string
 from core.llm import generate_response
 from core.logger import setup_logger
+from core.rate_limiter import get_rate_limiter
 from modules.analytics import stats_command
 from modules.commands import help_command, ping_command
 from modules.intent import IntentResult, IntentType, detect_intent
@@ -101,41 +102,63 @@ async def conversational_chat_handler(
         )
         return
 
+    # Extract user ID and enforce per-user prompt cooldown
+    user_id = message.from_user.id if message.from_user and isinstance(message.from_user.id, int) else None
+    limiter = get_rate_limiter()
+    if user_id:
+        allowed, remaining = limiter.check_user_cooldown(user_id)
+        if not allowed:
+            lang = await async_get_chat_language(chat.id)
+            notice = get_localized_string("rate_limit_user", lang)
+            await message.reply_text(notice)
+            return
+
     # Check for natural language or slash command intents and dispatch if recognized
     intent_result = detect_intent(cleaned_prompt)
     if await _dispatch_intent(intent_result, update, context):
         return
 
-    # Inform the user that Gemini is processing their response
+    # Enforce maximum concurrent AI generations per chat
+    chat_id = chat.id if isinstance(chat.id, int) else 0
+    if chat_id and not limiter.acquire_chat_slot(chat_id):
+        lang = await async_get_chat_language(chat_id)
+        notice = get_localized_string("rate_limit_chat", lang)
+        await message.reply_text(notice)
+        return
+
     try:
-        await context.bot.send_chat_action(
+        # Inform the user that Gemini is processing their response
+        try:
+            await context.bot.send_chat_action(
+                chat_id=chat.id,
+                action=ChatAction.TYPING,
+            )
+        except Exception as exc:
+            # Non-critical warning if typing action fails (e.g. transient network hiccup)
+            logger.warning(f"Failed to send typing chat action: {exc}")
+
+        # Extract caller user ID to look up their chosen persona and chat language
+        persona_key = await async_get_user_persona(user_id) if user_id else "standard"
+        language = await async_get_chat_language(chat.id)
+
+        # Generate response via the non-blocking Gemini wrapper with user's persona and language
+        result = await generate_response(
+            cleaned_prompt,
             chat_id=chat.id,
-            action=ChatAction.TYPING,
+            user_id=user_id,
+            persona_key=persona_key,
+            language=language,
         )
-    except Exception as exc:
-        # Non-critical warning if typing action fails (e.g. transient network hiccup)
-        logger.warning(f"Failed to send typing chat action: {exc}")
+        if isinstance(result, tuple):
+            ai_response, model_used = result
+        else:
+            ai_response, model_used = result, None
 
-    # Extract caller user ID to look up their chosen persona and chat language
-    user_id = message.from_user.id if message.from_user else None
-    persona_key = await async_get_user_persona(user_id) if user_id else "standard"
-    language = await async_get_chat_language(chat.id)
-
-    # Generate response via the non-blocking Gemini wrapper with user's persona and language
-    result = await generate_response(
-        cleaned_prompt,
-        chat_id=chat.id,
-        user_id=user_id,
-        persona_key=persona_key,
-        language=language,
-    )
-    if isinstance(result, tuple):
-        ai_response, model_used = result
-    else:
-        ai_response, model_used = result, None
-
-    # Reply directly to the user's message with rendered HTML and model attribution
-    await send_formatted_reply(message, format_reply_with_model(ai_response, model_used))
+        # Reply directly to the user's message with rendered HTML and model attribution
+        await send_formatted_reply(message, format_reply_with_model(ai_response, model_used))
+    finally:
+        if chat_id:
+            limiter.release_chat_slot(chat_id)
 
 
 def register_conversational(app: Application) -> None:
