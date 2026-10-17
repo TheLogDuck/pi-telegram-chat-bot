@@ -5,16 +5,23 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=admin
-WorkingDirectory=/home/admin/pi-telegram-chat-bot
+User=<username>
+WorkingDirectory=/home/<username>/pi-telegram-chat-bot
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/home/admin/pi-telegram-chat-bot/venv/bin/python main.py
+EnvironmentFile=/home/<username>/pi-telegram-chat-bot/.env
+ExecStart=/home/<username>/pi-telegram-chat-bot/venv/bin/python main.py
 Restart=always
-RestartSec=5
-TimeoutStopSec=10
+RestartSec=10
+TimeoutStopSec=15
 KillSignal=SIGTERM
 StandardOutput=journal
 StandardError=journal
+SyslogIdentifier=telegram-bot
+
+# Cgroup Resource Ceilings for Raspberry Pi 3B+
+MemoryMax=150M
+MemoryHigh=120M
+CPUQuota=80%
 
 [Install]
 WantedBy=multi-user.target

@@ -311,7 +311,7 @@ bash scripts/deploy.sh
 ### Deployment Pipeline Workflow (`scripts/update.sh` -> `scripts/deploy.sh`)
 
 1. **Repository Synchronization:** Pulls incoming commits from `origin/main`.
-2. **Virtual Environment Isolation:** Activates `/home/admin/pi-telegram-chat-bot/venv`.
+2. **Virtual Environment Isolation:** Activates the application's isolated `venv/` environment.
 3. **Dependency Sync:** Installs updated pinned packages via `pip install --no-input -r requirements.txt`.
 4. **Database Migration:** Executes idempotent schema initialization (`python -c "from core.database import init_db; init_db()"`).
 5. **Quality Gatekeeper:** Runs `pytest`. If any unit test fails, the bash `ERR` trap catches the exit code and aborts the entire execution before touching the running service.
@@ -329,10 +329,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=admin
-WorkingDirectory=/home/admin/pi-telegram-chat-bot
-EnvironmentFile=/home/admin/pi-telegram-chat-bot/.env
-ExecStart=/home/admin/pi-telegram-chat-bot/venv/bin/python main.py
+User=<username>
+WorkingDirectory=/home/<username>/pi-telegram-chat-bot
+EnvironmentFile=/home/<username>/pi-telegram-chat-bot/.env
+ExecStart=/home/<username>/pi-telegram-chat-bot/venv/bin/python main.py
 Restart=always
 RestartSec=10
 TimeoutStopSec=15
@@ -370,11 +370,10 @@ To eliminate Telegram `409 Conflict` errors caused by concurrent long-polling lo
 | Environment | Host System | Execution Model | Bot Token | Database Target |
 | :--- | :--- | :--- | :--- | :--- |
 | **Development** | Local Workstation | On-demand (`python main.py`) | Dev Bot Token | `bot_data.db` |
-| **Production** | Raspberry Pi 3B+ (`mypi`) | Systemd daemon (24/7) | Prod Bot Token | `bot_memory.db` |
+| **Production** | Raspberry Pi 3B+ (Edge Server) | Systemd daemon (24/7) | Prod Bot Token | `bot_memory.db` |
 
 ---
 
 ## Testing Strategy
 
-- **Unit Testing (212 tests):** All components (database queries, logging, intent parsing, error handling, token math, command routing, multilingual directives, concurrency semaphores) are tested offline with zero external network calls. Telegram and Gemini APIs are fully mocked with `unittest.mock`.
-- **End-to-End Synthetic Testing (`tests/e2e_tester.py`):** Features a headless test runner bot client (`TEST_RUNNER_BOT_TOKEN`) that fires synthetic user messages into a designated test group (`TEST_GROUP_CHAT_ID`) to validate live bot responses before merging to production.
+- **Unit Testing (212 tests):** All components (database queries, logging, intent parsing, error handling, token math, command routing, multilingual directives, concurrency semaphores) are tested offline with zero external network calls. Telegram and Gemini APIs are fully mocked with `unittest.mock`, validating regression resilience in approximately 2 seconds before any service reload.

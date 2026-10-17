@@ -93,7 +93,7 @@ def test_switch_reaction_admin_ignores_bot_username_in_group(
     update, context = make_update(
         chat_id=-1001,
         chat_type=ChatType.GROUP,
-        args=["@SketchyIntelligenceTestBot"],
+        args=["@test_bot"],
     )
 
     asyncio.run(switch_reaction_command(update, context))
