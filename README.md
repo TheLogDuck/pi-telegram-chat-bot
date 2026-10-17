@@ -2,12 +2,6 @@
 
 A production-grade, asynchronous AI assistant engineered for resource-constrained edge computing environments (Raspberry Pi 3B+). Features multi-model Google Gemini LLM orchestration, live Google Search grounding, multimodal image generation, token-level cost accounting, zero-dependency multilingual localization (EN, UK, RU, DE), bounded concurrency safeguards, micro-batched persistence, an owner-approval access gatekeeper, and an automated test-gated CI/CD pipeline.
 
-[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.14-blue.svg)](https://www.python.org/)
-[![Telegram Bot API](https://img.shields.io/badge/telegram--bot--api-v20%2B%20async-blue.svg)](https://python-telegram-bot.org/)
-[![Memory Footprint](https://img.shields.io/badge/memory%20footprint-~53%20MB%20RAM-success.svg)](https://github.com/)
-[![Test Suite](https://img.shields.io/badge/tests-212%20passed-brightgreen.svg)](https://pytest.org/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
 ---
 
 ## Technical Summary for Engineering Portfolios
