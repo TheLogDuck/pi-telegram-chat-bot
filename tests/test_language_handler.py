@@ -119,3 +119,12 @@ def test_start_callback_query_updates_greeting_in_language() -> None:
         mock_query.edit_message_text.assert_awaited_once()
         call_kwargs = mock_query.edit_message_text.call_args.kwargs
         assert "Вітаю!" in call_kwargs["text"]
+
+
+def test_format_start_text_includes_lang_command() -> None:
+    """Verifies that format_start_text includes greeting, /lang instruction, and language prompt."""
+    for lang in ("en", "uk", "ru", "de"):
+        text = format_start_text(lang)
+        assert "/lang" in text
+        assert "<b>" in text
+

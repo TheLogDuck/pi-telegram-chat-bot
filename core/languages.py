@@ -121,26 +121,30 @@ LOCALIZED_STRINGS: Dict[str, Dict[str, str]] = {
         "uk": (
             "<b>Вітаю!</b> Я ваш Telegram-бот на базі Raspberry Pi.\n\n"
             "Я підтримую інтелектуальне спілкування за допомогою Google Gemini AI.\n"
-            "У групах звертайтеся до мене через тег (наприклад, <code>@username</code>) або через відповідь (reply).\n"
-            "Введіть <code>/help</code>, щоб переглянути список доступних команд."
+            "• У групах звертайтеся до мене через тег (наприклад, <code>@username</code>) або через відповідь (reply).\n"
+            "• Введіть <code>/help</code>, щоб переглянути список доступних команд.\n\n"
+            "Ви можете змінити мову спілкування в будь-який момент за допомогою команди <code>/lang</code>."
         ),
         "ru": (
             "<b>Приветствую!</b> Я ваш Telegram-бот на базе Raspberry Pi.\n\n"
             "Я поддерживаю интеллектуальное общение с помощью Google Gemini AI.\n"
-            "В группах обращайтесь ко мне через тег (например, <code>@username</code>) или через ответ (reply).\n"
-            "Введите <code>/help</code>, чтобы просмотреть список доступных команд."
+            "• В группах обращайтесь ко мне через тег (например, <code>@username</code>) или через ответ (reply).\n"
+            "• Введите <code>/help</code>, чтобы просмотреть список доступных команд.\n\n"
+            "Вы можете изменить язык общения в любой момент с помощью команды <code>/lang</code>."
         ),
         "en": (
             "<b>Welcome!</b> I am your Telegram bot running on Raspberry Pi.\n\n"
             "I support smart conversation powered by Google Gemini AI.\n"
-            "In groups, mention me via tag (e.g., <code>@username</code>) or by replying to my messages.\n"
-            "Type <code>/help</code> to view the list of available commands."
+            "• In groups, mention me via tag (e.g., <code>@username</code>) or by replying to my messages.\n"
+            "• Type <code>/help</code> to view the list of available commands.\n\n"
+            "You can change the communication language at any time using the <code>/lang</code> command."
         ),
         "de": (
             "<b>Willkommen!</b> Ich bin Ihr Telegram-Bot auf Basis von Raspberry Pi.\n\n"
             "Ich unterstütze intelligente Konversationen powered by Google Gemini AI.\n"
-            "In Gruppen erwähnen Sie mich mit einem Tag (z. B. <code>@username</code>) oder per Antwort (reply).\n"
-            "Geben Sie <code>/help</code> ein, um die Liste der verfügbaren Befehle anzuzeigen."
+            "• In Gruppen erwähnen Sie mich mit einem Tag (z. B. <code>@username</code>) oder per Antwort (reply).\n"
+            "• Geben Sie <code>/help</code> ein, um die Liste der verfügbaren Befehle anzuzeigen.\n\n"
+            "Sie können die Sprache jederzeit mit dem Befehl <code>/lang</code> ändern."
         ),
     },
     "public_help_text": {
@@ -264,10 +268,10 @@ LOCALIZED_STRINGS: Dict[str, Dict[str, str]] = {
         "de": "In diesem Chat werden derzeit zu viele Anfragen verarbeitet. Bitte warten Sie einen Moment.",
     },
     "start_language_prompt": {
-        "en": "Choose your language / Оберіть мову спілкування:",
-        "uk": "Оберіть мову спілкування бота / Choose bot language:",
-        "ru": "Выберите язык общения бота / Choose bot language:",
-        "de": "Wählen Sie die Sprache des Bots / Choose bot language:",
+        "en": "Select your language below or use /lang at any time:",
+        "uk": "Оберіть мову спілкування нижче або скористайтеся /lang у будь-який момент:",
+        "ru": "Выберите язык общения ниже или используйте /lang в любой момент:",
+        "de": "Wählen Sie unten Ihre Sprache oder nutzen Sie jederzeit /lang:",
     },
     "language_selected_badge": {
         "en": "[Selected]",

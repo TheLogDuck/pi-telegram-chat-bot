@@ -38,6 +38,7 @@ def test_start_command() -> None:
     assert mock_update.effective_message.reply_text.await_count == 1
     call_args = mock_update.effective_message.reply_text.await_args
     assert call_args.args[0] == START_TEXT
+    assert "/lang" in call_args.args[0]
     assert "reply_markup" in call_args.kwargs
     assert call_args.kwargs["reply_markup"] is not None
     assert call_args.kwargs["parse_mode"] == ParseMode.HTML
@@ -148,6 +149,7 @@ def test_commands_localized_language() -> None:
         asyncio.run(start_command(mock_update, mock_context))
         call_text = mock_update.effective_message.reply_text.call_args[0][0]
         assert "Приветствую!" in call_text
+        assert "/lang" in call_text
 
         # Test /ping in Russian
         asyncio.run(ping_command(mock_update, mock_context))
@@ -182,6 +184,7 @@ def test_chat_member_welcome_in_groups() -> None:
     call_kwargs = mock_context.bot.send_message.await_args.kwargs
     assert call_kwargs["chat_id"] == -100999
     assert START_TEXT in call_kwargs["text"]
+    assert "/lang" in call_kwargs["text"]
     assert call_kwargs["reply_markup"] is not None
 
 
