@@ -52,3 +52,65 @@ def test_semaphore_limits_concurrency():
         assert peak_concurrent == max_concurrent
 
     asyncio.run(_run_test())
+
+
+def test_semaphore_releases_on_exception():
+    """Verifies that an exception inside the critical section releases the permit."""
+    async def _run_test():
+        sem = get_llm_semaphore(limit=1)
+
+        # 1. Simulate a worker that fails unexpectedly during execution
+        with pytest.raises(RuntimeError):
+            async with sem:
+                raise RuntimeError("Simulated Gemini API network timeout")
+
+        # 2. Check internal counter: the permit must have been restored
+        assert sem._value == 1
+
+        # 3. Confirm another task can immediately acquire the semaphore without blocking
+        acquired = False
+        async with sem:
+            acquired = True
+        assert acquired is True
+
+    asyncio.run(_run_test())
+
+
+def test_semaphore_task_cancellation_releases_permit():
+    """Verifies that cancelling a task holding the semaphore restores the available permit."""
+    async def _run_test():
+        sem = get_llm_semaphore(limit=1)
+
+        async def worker():
+            async with sem:
+                # Sleep long enough for the outer caller to cancel this task
+                await asyncio.sleep(5.0)
+
+        task = asyncio.create_task(worker())
+        await asyncio.sleep(0.01)  # Ensure task has entered the critical section
+
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        # Permit should be released back to 1
+        assert sem._value == 1
+
+    asyncio.run(_run_test())
+
+
+def test_semaphore_reinitialization_after_reset():
+    """Verifies that reset_llm_semaphore allows creating a new instance with a different limit."""
+    sem_default = get_llm_semaphore()
+    assert sem_default._value == DEFAULT_MAX_CONCURRENT_LLM_CALLS
+
+    # Calling again with a different limit returns the existing instance (singleton)
+    sem_cached = get_llm_semaphore(limit=99)
+    assert sem_cached is sem_default
+    assert sem_cached._value == DEFAULT_MAX_CONCURRENT_LLM_CALLS
+
+    # After resetting, a new semaphore with the new limit must be created
+    reset_llm_semaphore()
+    sem_custom = get_llm_semaphore(limit=5)
+    assert sem_custom is not sem_default
+    assert sem_custom._value == 5

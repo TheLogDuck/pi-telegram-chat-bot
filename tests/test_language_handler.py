@@ -128,3 +128,66 @@ def test_format_start_text_includes_lang_command() -> None:
         assert "/lang" in text
         assert "<b>" in text
 
+
+def test_language_callback_unsupported_language_code() -> None:
+    """Verifies that selecting an unsupported language rejects without modifying state."""
+    mock_update = MagicMock()
+    mock_query = AsyncMock()
+    mock_query.data = f"{CALLBACK_PREFIX}invalid_code"
+    mock_update.callback_query = mock_query
+    mock_update.effective_chat = MagicMock(id=-100777)
+    mock_context = MagicMock()
+
+    with patch("modules.language.async_set_chat_language", new_callable=AsyncMock) as mock_set:
+        asyncio.run(language_callback_query(mock_update, mock_context))
+
+        # Must answer query with error message and NOT touch database or edit message
+        mock_set.assert_not_called()
+        mock_query.answer.assert_awaited_once_with("Невідома мова / Unknown language.")
+        mock_query.edit_message_text.assert_not_called()
+
+
+def test_language_handlers_handle_none_update_fields() -> None:
+    """Verifies that missing message, chat, or callback_query objects fail silently."""
+    mock_context = MagicMock()
+
+    # 1. language_command with None message and None chat
+    empty_update = MagicMock(effective_message=None, effective_chat=None)
+    asyncio.run(language_command(empty_update, mock_context))
+
+    # 2. language_callback_query with None query
+    no_query_update = MagicMock(callback_query=None, effective_chat=MagicMock(id=123))
+    asyncio.run(language_callback_query(no_query_update, mock_context))
+
+    # 3. language_callback_query with None chat
+    no_chat_update = MagicMock(callback_query=MagicMock(data="lang:set:en"), effective_chat=None)
+    asyncio.run(language_callback_query(no_chat_update, mock_context))
+
+
+def test_language_callback_edit_exception_swallowed() -> None:
+    """Verifies that an error when editing message (e.g. repeated button click) does not raise."""
+    mock_update = MagicMock()
+    mock_query = AsyncMock()
+    mock_query.data = f"{CALLBACK_PREFIX}en"
+    mock_query.edit_message_text.side_effect = Exception("BadRequest: Message is not modified")
+    mock_update.callback_query = mock_query
+    mock_update.effective_chat = MagicMock(id=-100111)
+    mock_context = MagicMock()
+
+    with patch("modules.language.async_set_chat_language", new_callable=AsyncMock):
+        # Should not raise exception despite edit_message_text failing
+        asyncio.run(language_callback_query(mock_update, mock_context))
+        mock_query.answer.assert_awaited_once()
+
+
+def test_build_language_keyboard_unrecognized_code() -> None:
+    """Verifies that building keyboard with an unknown language code marks no button as active."""
+    markup = build_language_keyboard("unsupported_xyz")
+    buttons = [row[0] for row in markup.inline_keyboard]
+    assert len(buttons) == 4
+
+    for button in buttons:
+        # None of the buttons should contain the selected badge
+        assert "[Selected]" not in button.text
+        assert "[Обрано]" not in button.text
+

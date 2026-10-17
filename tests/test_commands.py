@@ -188,4 +188,71 @@ def test_chat_member_welcome_in_groups() -> None:
     assert call_kwargs["reply_markup"] is not None
 
 
+def test_chat_member_no_welcome_on_promotion_or_removal() -> None:
+    """Verifies that promoting a bot to admin or kicking it does not re-send greeting."""
+    from telegram import Chat, ChatMemberUpdated
+    from telegram.constants import ChatMemberStatus, ChatType
+
+    mock_update = MagicMock()
+    mock_chat = MagicMock(spec=Chat, id=-100999, type=ChatType.SUPERGROUP)
+    mock_update.effective_chat = mock_chat
+    mock_context = MagicMock()
+    mock_context.bot.send_message = AsyncMock()
+
+    # Case 1: Promoted from MEMBER to ADMINISTRATOR (already a member)
+    mock_update.my_chat_member = MagicMock(
+        spec=ChatMemberUpdated,
+        old_chat_member=MagicMock(status=ChatMemberStatus.MEMBER),
+        new_chat_member=MagicMock(status=ChatMemberStatus.ADMINISTRATOR),
+    )
+    asyncio.run(chat_member_update_handler(mock_update, mock_context))
+    mock_context.bot.send_message.assert_not_called()
+
+    # Case 2: Removed from chat (status becomes LEFT)
+    mock_update.my_chat_member = MagicMock(
+        spec=ChatMemberUpdated,
+        old_chat_member=MagicMock(status=ChatMemberStatus.MEMBER),
+        new_chat_member=MagicMock(status=ChatMemberStatus.LEFT),
+    )
+    asyncio.run(chat_member_update_handler(mock_update, mock_context))
+    mock_context.bot.send_message.assert_not_called()
+
+
+def test_chat_member_update_ignores_private_chat_or_none_update() -> None:
+    """Verifies that non-group chats or missing my_chat_member objects send no messages."""
+    from telegram import Chat, ChatMemberUpdated
+    from telegram.constants import ChatMemberStatus, ChatType
+
+    mock_context = MagicMock()
+    mock_context.bot.send_message = AsyncMock()
+
+    # 1. Update with None my_chat_member
+    asyncio.run(chat_member_update_handler(MagicMock(my_chat_member=None), mock_context))
+    mock_context.bot.send_message.assert_not_called()
+
+    # 2. Update in a private chat
+    private_chat = MagicMock(spec=Chat, id=123, type=ChatType.PRIVATE)
+    update = MagicMock(
+        effective_chat=private_chat,
+        my_chat_member=MagicMock(
+            spec=ChatMemberUpdated,
+            old_chat_member=MagicMock(status=ChatMemberStatus.LEFT),
+            new_chat_member=MagicMock(status=ChatMemberStatus.MEMBER),
+        ),
+    )
+    asyncio.run(chat_member_update_handler(update, mock_context))
+    mock_context.bot.send_message.assert_not_called()
+
+
+def test_command_handlers_handle_none_message() -> None:
+    """Verifies that /start, /help, and /ping handle updates with None effective_message safely."""
+    mock_update = MagicMock(effective_message=None, effective_chat=None)
+    mock_context = MagicMock()
+
+    # None of these should throw AttributeError: 'NoneType' object has no attribute 'reply_text'
+    asyncio.run(start_command(mock_update, mock_context))
+    asyncio.run(help_command(mock_update, mock_context))
+    asyncio.run(ping_command(mock_update, mock_context))
+
+
 
