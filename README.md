@@ -4,7 +4,7 @@ A production-grade, asynchronous AI assistant engineered for resource-constraine
 
 ---
 
-## Technical Summary for Engineering Portfolios
+## Technical Summary
 
 This project demonstrates the design and deployment of a resilient, full-stack edge AI service operating 24/7 on constrained ARM hardware under strict network isolation. It highlights practical trade-offs in systems programming, asynchronous event loops, LLM cost management, and automated operational pipelines.
 
@@ -85,7 +85,7 @@ sequenceDiagram
     Bot->>Intent: Classify text & extract arguments (EN, UK, RU, DE)
     
     alt Standard Command or Fuzzy Match
-        Intent-->>Bot: Routed to feature (News / Roast / Meme / Lang / Chat)
+        Intent-->>Bot: Routed to feature
     end
 
     Bot->>Core: Request inference (chat context + persona + language directives)
