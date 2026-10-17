@@ -13,7 +13,7 @@ def test_supported_languages_contains_four_core_languages() -> None:
     """Verifies that Ukrainian, Russian, English, and German are all registered."""
     expected_codes = {"uk", "ru", "en", "de"}
     assert expected_codes.issubset(set(SUPPORTED_LANGUAGES.keys()))
-    assert DEFAULT_LANGUAGE == "uk"
+    assert DEFAULT_LANGUAGE == "en"
 
 
 def test_is_supported_language() -> None:
@@ -38,9 +38,9 @@ def test_get_language_directive() -> None:
     assert "in English" in en_directive
     assert "auf Deutsch" in de_directive
 
-    # Fallback to default language (uk) if unknown code is provided
+    # Fallback to default language (en) if unknown code is provided
     fallback_directive = get_language_directive("fr")
-    assert "українською мовою" in fallback_directive
+    assert "in English" in fallback_directive
 
 
 def test_get_localized_string() -> None:
@@ -52,7 +52,7 @@ def test_get_localized_string() -> None:
     assert "Sprache auswählen" in get_localized_string("select_language_title", "de")
 
     # Fallback to default language if requested language is unsupported
-    assert "Оберіть мову" in get_localized_string("select_language_title", "unknown_lang")
+    assert "Select language" in get_localized_string("select_language_title", "unknown_lang")
 
 
 def test_rate_limit_strings_available_in_all_languages() -> None:

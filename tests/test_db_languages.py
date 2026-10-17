@@ -20,10 +20,10 @@ def temp_db_path() -> str:
     return path
 
 
-def test_get_chat_language_default_is_uk(temp_db_path: str) -> None:
-    """Verifies that an unconfigured chat defaults to Ukrainian ('uk')."""
+def test_get_chat_language_default_is_en(temp_db_path: str) -> None:
+    """Verifies that an unconfigured chat defaults to English ('en')."""
     lang = get_chat_language(-10012345, db_path=temp_db_path)
-    assert lang == "uk"
+    assert lang == "en"
 
 
 def test_set_and_get_chat_language(temp_db_path: str) -> None:
@@ -43,10 +43,10 @@ def test_async_get_and_set_chat_language(temp_db_path: str) -> None:
 
     async def run_async_flow() -> None:
         default_lang = await async_get_chat_language(chat_id, db_path=temp_db_path)
-        assert default_lang == "uk"
+        assert default_lang == "en"
 
-        await async_set_chat_language(chat_id, "en", db_path=temp_db_path)
+        await async_set_chat_language(chat_id, "uk", db_path=temp_db_path)
         updated_lang = await async_get_chat_language(chat_id, db_path=temp_db_path)
-        assert updated_lang == "en"
+        assert updated_lang == "uk"
 
     asyncio.run(run_async_flow())

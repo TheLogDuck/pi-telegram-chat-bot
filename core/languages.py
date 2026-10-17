@@ -2,7 +2,7 @@
 # Designed for Raspberry Pi 3B+ to maintain zero external library bloat (<10 KB RAM).
 from typing import Dict
 
-DEFAULT_LANGUAGE = "uk"
+DEFAULT_LANGUAGE = "en"
 
 SUPPORTED_LANGUAGES: Dict[str, str] = {
     "uk": "Українська",
@@ -262,6 +262,18 @@ LOCALIZED_STRINGS: Dict[str, Dict[str, str]] = {
         "ru": "В этом чате сейчас выполняется слишком много запросов. Подождите минутку.",
         "en": "Too many requests are being processed in this chat right now. Please wait a moment.",
         "de": "In diesem Chat werden derzeit zu viele Anfragen verarbeitet. Bitte warten Sie einen Moment.",
+    },
+    "start_language_prompt": {
+        "en": "Choose your language / Оберіть мову спілкування:",
+        "uk": "Оберіть мову спілкування бота / Choose bot language:",
+        "ru": "Выберите язык общения бота / Choose bot language:",
+        "de": "Wählen Sie die Sprache des Bots / Choose bot language:",
+    },
+    "language_selected_badge": {
+        "en": "[Selected]",
+        "uk": "[Обрано]",
+        "ru": "[Выбрано]",
+        "de": "[Ausgewählt]",
     },
 }
 

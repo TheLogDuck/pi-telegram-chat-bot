@@ -23,10 +23,7 @@ from modules.persona import persona_command
 logger = setup_logger("conversational")
 
 # Prompt returned when the user tags the bot without any query
-EMPTY_TAG_PROMPT = (
-    "<b>Привіт!</b> Чим я можу вам допомогти?\n"
-    "Напишіть своє запитання або введіть <code>/help</code> для перегляду списку команд."
-)
+EMPTY_TAG_PROMPT = get_localized_string("empty_tag_prompt", "en")
 
 
 from core.telegram_utils import (

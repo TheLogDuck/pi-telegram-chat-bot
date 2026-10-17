@@ -73,7 +73,7 @@ def test_roast_command_with_explicit_arg(
         chat_id=12345,
         user_id=777,
         persona_key="standard",
-        language="uk",
+        language="en",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
         "<b>Роаст @developer:</b> Забагато кави!\n\ngemini-3.8-flash",
@@ -114,7 +114,7 @@ def test_roast_command_from_reply_message(
         chat_id=12345,
         user_id=777,
         persona_key="standard",
-        language="uk",
+        language="en",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
         "<b>Роаст @victim:</b> Привіт жертві!\n\ngemini-3.8-flash",
@@ -133,7 +133,7 @@ def test_roast_command_no_target_shows_help() -> None:
     # Should reply with help text in HTML
     update.effective_message.reply_text.assert_awaited_once()
     args, kwargs = update.effective_message.reply_text.call_args
-    assert "Кому саме влаштувати прожарку?" in args[0]
+    assert "Who should be roasted?" in args[0]
     assert "<code>/roast @username</code>" in args[0]
     assert "&lt;code&gt;" not in args[0]
     assert kwargs.get("parse_mode") == ParseMode.HTML
@@ -179,7 +179,7 @@ def test_roast_command_reply_to_bot_injects_message_text(
         chat_id=12345,
         user_id=777,
         persona_key="standard",
-        language="uk",
+        language="en",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
         "<b>Роаст @OtherBot:</b> Смішний жарт!\n\ngemini-3.8-flash",

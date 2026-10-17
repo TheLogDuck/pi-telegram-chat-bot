@@ -44,7 +44,7 @@ def test_news_command_with_explicit_topic(mock_generate: AsyncMock) -> None:
         topic="штучний інтелект",
         chat_id=12345,
         user_id=None,
-        language="uk",
+        language="en",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
         "1. Новини штучного інтелекту...\n\ngemini-3.8-flash",
@@ -67,7 +67,7 @@ def test_news_command_with_context_args(mock_generate: AsyncMock) -> None:
         topic="space tech",
         chat_id=12345,
         user_id=None,
-        language="uk",
+        language="en",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
         "1. Новини космосу...\n\ngemini-3.8-flash",
@@ -90,7 +90,7 @@ def test_news_command_default_headlines(mock_generate: AsyncMock) -> None:
         topic=None,
         chat_id=12345,
         user_id=None,
-        language="uk",
+        language="en",
     )
     update.effective_message.reply_text.assert_awaited_once_with(
         "1. Головні новини...\n\ngemini-3.8-flash",

@@ -92,7 +92,7 @@ def test_persona_command_no_args_displays_keyboard(tmp_path) -> None:
 
         message.reply_text.assert_awaited_once()
         call_kwargs = message.reply_text.await_args.kwargs
-        assert "Вибір стилю спілкування бота:" in message.reply_text.await_args.args[0]
+        assert "Bot communication style selection:" in message.reply_text.await_args.args[0]
         assert call_kwargs["reply_markup"] is not None
         assert call_kwargs["parse_mode"] == ParseMode.HTML
 

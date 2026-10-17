@@ -13,10 +13,7 @@ from core.logger import setup_logger
 
 logger = setup_logger("meme")
 
-NO_PROMPT_MESSAGE = (
-    "<b>Вкажіть опис:</b> Будь ласка, вкажіть опис для генерації мему. Наприклад:\n"
-    "<code>/meme кіт програміст лагодить сервер на Raspberry Pi</code>"
-)
+NO_PROMPT_MESSAGE = get_localized_string("no_prompt_meme_help", "en")
 
 
 async def meme_command(

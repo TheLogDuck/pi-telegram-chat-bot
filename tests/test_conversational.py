@@ -267,7 +267,7 @@ def test_conversational_handler_user_rate_limited(mock_generate: AsyncMock) -> N
     asyncio.run(conversational_chat_handler(update2, context))
     # generate_response should NOT have been called a second time
     assert mock_generate.await_count == 1
-    expected_notice = get_localized_string("rate_limit_user", "uk")
+    expected_notice = get_localized_string("rate_limit_user", "en")
     update2.effective_message.reply_text.assert_awaited_once_with(expected_notice)
 
 
@@ -297,6 +297,6 @@ def test_conversational_handler_chat_concurrency_limited(mock_generate: AsyncMoc
 
     # Gemini must not have been called
     mock_generate.assert_not_called()
-    expected_notice = get_localized_string("rate_limit_chat", "uk")
+    expected_notice = get_localized_string("rate_limit_chat", "en")
     update.effective_message.reply_text.assert_awaited_once_with(expected_notice)
 

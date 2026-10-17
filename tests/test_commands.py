@@ -6,9 +6,12 @@ from telegram import Update
 from telegram.constants import ParseMode
 from modules.commands import (
     BOT_COMMANDS,
+    BOT_DESCRIPTION,
+    BOT_SHORT_DESCRIPTION,
     HELP_TEXT,
     PING_TEXT,
     START_TEXT,
+    chat_member_update_handler,
     help_command,
     ping_command,
     set_bot_commands,
@@ -26,16 +29,18 @@ def make_mock_update() -> MagicMock:
     return update
 
 def test_start_command() -> None:
-    """Verifies that /start sends the expected greeting text."""
+    """Verifies that /start sends the expected English greeting text and language keyboard."""
     mock_update = make_mock_update()
     mock_context = MagicMock()
 
     asyncio.run(start_command(mock_update, mock_context))
 
-    mock_update.effective_message.reply_text.assert_awaited_once_with(
-        START_TEXT,
-        parse_mode=ParseMode.HTML,
-    )
+    assert mock_update.effective_message.reply_text.await_count == 1
+    call_args = mock_update.effective_message.reply_text.await_args
+    assert call_args.args[0] == START_TEXT
+    assert "reply_markup" in call_args.kwargs
+    assert call_args.kwargs["reply_markup"] is not None
+    assert call_args.kwargs["parse_mode"] == ParseMode.HTML
 
 def test_help_command_regular_user() -> None:
     """Verifies that /help sends the public command directory to regular users."""
@@ -46,7 +51,7 @@ def test_help_command_regular_user() -> None:
     asyncio.run(help_command(mock_update, mock_context))
 
     call_text = mock_update.effective_message.reply_text.call_args[0][0]
-    assert "Основні команди:" in call_text
+    assert "Core commands:" in call_text
     assert "Administration:" not in call_text
 
 
@@ -116,15 +121,19 @@ def test_stats_command_owner(monkeypatch) -> None:
 
 
 def test_set_bot_commands(monkeypatch) -> None:
-    """Verifies that set_bot_commands registers default scope and admin scope."""
+    """Verifies that set_bot_commands registers commands and descriptions."""
     monkeypatch.setenv("ADMIN_CHAT_ID", "12345")
     mock_app = MagicMock()
     mock_app.bot.set_my_commands = AsyncMock()
+    mock_app.bot.set_my_description = AsyncMock()
+    mock_app.bot.set_my_short_description = AsyncMock()
 
     asyncio.run(set_bot_commands(mock_app))
 
     # Should register public commands and admin-scoped commands
     assert mock_app.bot.set_my_commands.await_count == 2
+    mock_app.bot.set_my_description.assert_awaited_once_with(BOT_DESCRIPTION)
+    mock_app.bot.set_my_short_description.assert_awaited_once_with(BOT_SHORT_DESCRIPTION)
 
 
 def test_commands_localized_language() -> None:
@@ -149,6 +158,31 @@ def test_commands_localized_language() -> None:
         asyncio.run(help_command(mock_update, mock_context))
         call_text = mock_update.effective_message.reply_text.call_args[0][0]
         assert "Справка по командам" in call_text
+
+
+def test_chat_member_welcome_in_groups() -> None:
+    """Verifies that adding the bot to a group sends the startup greeting in English."""
+    from telegram import Chat, ChatMember, ChatMemberUpdated
+    from telegram.constants import ChatMemberStatus, ChatType
+
+    mock_update = MagicMock()
+    mock_chat = MagicMock(spec=Chat, id=-100999, type=ChatType.SUPERGROUP)
+    mock_update.effective_chat = mock_chat
+
+    old_member = MagicMock(status=ChatMemberStatus.LEFT)
+    new_member = MagicMock(status=ChatMemberStatus.MEMBER)
+    mock_update.my_chat_member = MagicMock(spec=ChatMemberUpdated, old_chat_member=old_member, new_chat_member=new_member)
+
+    mock_context = MagicMock()
+    mock_context.bot.send_message = AsyncMock()
+
+    asyncio.run(chat_member_update_handler(mock_update, mock_context))
+
+    mock_context.bot.send_message.assert_awaited_once()
+    call_kwargs = mock_context.bot.send_message.await_args.kwargs
+    assert call_kwargs["chat_id"] == -100999
+    assert START_TEXT in call_kwargs["text"]
+    assert call_kwargs["reply_markup"] is not None
 
 
 

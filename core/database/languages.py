@@ -1,5 +1,5 @@
 # Per-chat language preference storage and retrieval in SQLite.
-# Configures default 'uk' language for unconfigured chats.
+# Configures default 'en' language for unconfigured chats.
 import asyncio
 from datetime import datetime, timezone
 from typing import Optional
@@ -8,7 +8,7 @@ from .connection import get_connection, get_db_path
 
 
 def get_chat_language(chat_id: int, db_path: Optional[str] = None) -> str:
-    """Retrieves the active language code for a chat, defaulting to 'uk'."""
+    """Retrieves the active language code for a chat, defaulting to 'en'."""
     if not isinstance(chat_id, int):
         return DEFAULT_LANGUAGE
 
