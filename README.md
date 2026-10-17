@@ -1,5 +1,9 @@
 # Edge-Optimized AI Telegram Bot
 
+[![CI Pipeline](https://github.com/TheLogDuck/pi-telegram-chat-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/TheLogDuck/pi-telegram-chat-bot/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+
 A production-grade, asynchronous AI assistant engineered for resource-constrained edge computing environments (Raspberry Pi 3B+). Features multi-model Google Gemini LLM orchestration, live Google Search grounding, multimodal image generation, token-level cost accounting, zero-dependency multilingual localization (EN, UK, RU, DE), bounded concurrency safeguards, micro-batched persistence, an owner-approval access gatekeeper, and an automated test-gated CI/CD pipeline.
 
 ---
@@ -294,13 +298,25 @@ python main.py
 
 Production runs as an isolated `systemd` service on the Raspberry Pi edge device. Deployments utilize a two-tier pull-based architecture (`scripts/update.sh` -> `scripts/deploy.sh`) that eliminates self-modification hazards and guarantees zero-downtime regression protection.
 
-```bash
-# Pulls from Git and executes deployment sequence
-bash scripts/update.sh
+### Deployment Execution Triggers
 
-# Or run deployment sequence directly without pulling from Git
-bash scripts/deploy.sh
-```
+The deployment pipeline can be invoked on-demand or run automatically on a schedule:
+
+1. **On-Demand Manual Trigger (via SSH):**
+   ```bash
+   # Pulls latest commits from Git and executes the deployment sequence
+   bash scripts/update.sh
+
+   # Or run deployment sequence directly without pulling from Git
+   bash scripts/deploy.sh
+   ```
+
+2. **Automated Scheduled Reconciliation (Nightly Crontab):**
+   To ensure the edge node automatically syncs verified updates without manual intervention, a nightly cron job triggers `scripts/update.sh` during off-peak hours (04:00 AM):
+   ```cron
+   0 4 * * * /bin/bash /home/<user>/pi-telegram-chat-bot/scripts/update.sh >> /home/<user>/pi-telegram-chat-bot/update.log 2>&1
+   ```
+   If unverified code or broken commits were ever pushed to `origin/main`, the local `pytest` gatekeeper catches the failure and immediately aborts the deployment before touching `systemd`, ensuring the running production process remains unaffected.
 
 ### Deployment Pipeline Workflow (`scripts/update.sh` -> `scripts/deploy.sh`)
 

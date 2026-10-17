@@ -1,0 +1,29 @@
+[project]
+name = "pi-telegram-chat-bot"
+version = "1.0.0"
+description = "Edge-optimized asynchronous AI Telegram bot running on Raspberry Pi 3B+"
+requires-python = ">=3.11"
+readme = "README.md"
+license = { text = "MIT" }
+
+[tool.pytest.ini_options]
+# Define where pytest should discover unit tests
+testpaths = ["tests"]
+# Recognize standard test module naming conventions
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+# Verbose test reporting to view individual test pass/fail status
+addopts = "-v"
+
+[tool.ruff]
+# Target Python 3.11 runtime features
+target-version = "py311"
+# Standard readable line length
+line-length = 120
+
+[tool.ruff.lint]
+# E = pycodestyle syntax & whitespace errors
+# F = pyflakes (detects undefined variables and broken code)
+select = ["E", "F"]
+# Ignore line-too-long (E501) to allow descriptive docstrings and prompts
+ignore = ["E501"]
