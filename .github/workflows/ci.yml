@@ -27,10 +27,10 @@ jobs:
           pip install -r requirements.txt
           pip install ruff
 
-      - name: Run Ruff Linter
-        run: |
-          ruff check .
-
       - name: Run Pytest
         run: |
           pytest
+
+      - name: Run Ruff Linter
+        run: |
+          ruff check .

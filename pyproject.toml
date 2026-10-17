@@ -23,7 +23,17 @@ line-length = 120
 
 [tool.ruff.lint]
 # E = pycodestyle syntax & whitespace errors
-# F = pyflakes (detects undefined variables and broken code)
+# F = pyflakes (detects undefined variables, syntax errors, and broken code)
 select = ["E", "F"]
-# Ignore line-too-long (E501) to allow descriptive docstrings and prompts
-ignore = ["E501"]
+ignore = [
+    "E501",  # Line too long (allows long prompts, URLs, and documentation)
+    "E402",  # Module level import not at top of file (required for load_dotenv() in main.py)
+    "F401",  # Unused imports (common in package __init__.py files)
+    "F841",  # Unused local variables (common in mock unpacking)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Unit tests frequently import test fixtures, mocks, and unused test helpers
+"tests/*" = ["E", "F", "W"]
+"__init__.py" = ["F401"]
+
